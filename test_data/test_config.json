@@ -1,0 +1,43 @@
+{
+    /* Listen on other addresses is pointless.                                                                        */
+    "address": "127.0.0.1",
+
+    /* By default listen on port 8086, like first intel commercially successful cpu model.                            */
+    "port": 8086,
+
+    /* Path location of certificate file                                                                              */
+    "cert": "../../test_data/example.crt",
+
+    /* Path location of certificate key                                                                               */
+    "key": "../../test_data/example.key",
+
+    /* We really want to use https for backup archive tranferring.                                                    */
+    "nohttps": false,
+
+    /* Which location we should query by our client curl, for example.                                                */
+    "location": "/archive",
+
+    /* User for basic auth.                                                                                           */
+    "user": "JohnnyGoode",
+
+    /* Password for basic auth.                                                                                       */
+    "password": "SharpShooter",
+
+    /* Where to store logs.                                                                                           */
+    "log": "/var/log/backer.log",
+
+    /* Verbosity of logs                                                                                              */
+    "loglevel": "info",
+
+    /* Directories to backup                                                                                          */
+    "directories": [
+        "../../test_data/test1/foo",
+        "../../test_data/test1/bar"
+    ],
+
+    /* Backup streaming timeout in minutes.                                                                           */
+    "backup_timeout": 60,
+
+    /* Gzip compression level (1-9, where 9 is best compression).                                                    */
+    "compression_level": 6
+}

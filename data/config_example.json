@@ -1,0 +1,37 @@
+{
+    /* Listen on other addresses is pointless.                                                                        */
+    "address": "0.0.0.0",
+
+    /* By default listen on port 8086, like first intel commercially successful cpu model.                            */
+    "port": 8086,
+
+    /* Path location of certificate file, never use example from test_data!                                           */
+    "cert": "path/to/certificate.crt",
+
+    /* Path location of certificate key, never use example from test_data!                                            */
+    "key": "/path/to/certificate.key",
+
+    /* We really want to use https for backup archive tranferring.                                                    */
+    "nohttps": false,
+
+    /* Which location we should query by our client curl, for example.                                                */
+    "location": "/archive",
+
+    /* User for basic auth.                                                                                           */
+    "user": "secret",
+
+    /* Password for basic auth.                                                                                       */
+    "password": "Hush-hush secret password",
+
+    /* Where to store logs.                                                                                           */
+    "log": "/var/log/backer.log",
+
+    /* Verbosity of logs                                                                                              */
+    "loglevel": "info",
+
+    /* Diretories to backup                                                                                           */
+    "directories": [
+        "/path/to/directory1",
+        "/path/to/directory2"
+    ]
+}

@@ -1,0 +1,14 @@
+#+TITLE: Backer TODO List
+#+AUTHOR: Backer Project
+#+DATE: <2026-03-25 Wed>
+
+* TODO Backer Tasks
+
+** TODO Consider different compression algorithms
+   - [ ] Evaluate alternatives to gzip: bz2, xz, lzo, lz4
+   - [ ] lz4 for speed, xz for better compression
+   - [ ] Add compression_algorithm config option
+
+** TODO Configurable filename prefix
+   - [ ] Move "backup" prefix to config (currently hardcoded in newServer.go)
+   - [ ] Default: "backup", e.g., "backup-20260325-092341.tar.gz"

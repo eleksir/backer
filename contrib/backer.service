@@ -1,0 +1,14 @@
+[Unit]
+Description=Backer Backup Service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/backer
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

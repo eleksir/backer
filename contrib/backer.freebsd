@@ -1,0 +1,30 @@
+#!/bin/sh
+
+# PROVIDE: backer
+# REQUIRE: NETWORKING
+# BEFORE: DAEMON
+
+. /etc/rc.subr
+
+name="backer"
+rcvar="backer_enable"
+command="/usr/local/sbin/backer"
+command_args=""
+pidfile="/var/run/${name}.pid"
+
+load_rc_config $name
+
+: ${backer_enable:="no"}
+: ${backer_user:="root"}
+: ${backer_group:="wheel"}
+: ${backer_logfile:="/var/log/backer.log"}
+
+start_cmd="${name}_start"
+
+backer_start()
+{
+    echo "Starting ${name}."
+    /usr/sbin/daemon -p ${pidfile} -f ${command} ${command_args}
+}
+
+run_rc_command "$1"

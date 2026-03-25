@@ -1,0 +1,18 @@
+#!/sbin/openrc-run
+
+name="$SVCNAME"
+command="/var/lib/$SVCNAME/$SVCNAME"
+supervisor="supervise-daemon"
+pidfile="/run/$SVCNAME/$SVCNAME.pid"
+
+depend() {
+        need net
+        use dns
+}
+
+start_pre() {
+        mkdir -p /var/log/$SVCNAME
+        mkdir -p /run/$SVCNAME
+}
+
+# vim: set ft=sh noet ai ts=4 sw=4 sts=4:

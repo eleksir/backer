@@ -1,0 +1,4 @@
+github.com/hjson/hjson-go v3.3.0+incompatible h1:Rqr+Ya+0aCJMjaE4s8E9YKvuJLuLVpEvz4ONum52vnI=
+github.com/hjson/hjson-go v3.3.0+incompatible/go.mod h1:qsetwF8NlsTsOTwZTApNlTCerV+b2GjYRRcIk4JMFio=
+github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
+github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=

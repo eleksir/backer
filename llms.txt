@@ -1,0 +1,207 @@
+# llms.txt for Backer
+
+## Overview
+Backer is a Go-based backup utility that creates tar.gz archives on-the-fly and serves them via HTTP/HTTPS with basic authentication.
+
+## Quick Start
+```bash
+make                                    # Build binary
+make build VERSION=0.1.0                # Build with version
+backer                                  # Run with default config (/etc/backer.json)
+backer -c /path/to/config.json          # Run with custom config
+backer --version                        # Show version
+backer -h                               # Show help
+curl -u user:pass https://server:8086/archive -o backup.tar.gz
+```
+
+## Config File Locations
+- Linux: `/etc/backer.json`
+- FreeBSD/NetBSD/OpenBSD/DragonFly: `/usr/local/etc/backer.json`
+- Override with `-c` flag
+
+## Directory Structure
+```
+/
+├── cmd/backer/main.go       # Entry point, CLI flags, server startup
+├── internal/
+│   ├── backer/              # Core logic
+│   │   ├── types.go         # Config struct definition
+│   │   ├── globals.go       # Global C Config variable
+│   │   ├── loadConfig.go    # HJSON/JSON config parsing with validation
+│   │   ├── newServer.go     # HTTP server, auth handler, context helpers
+│   │   ├── utils.go         # CreateTarGzStream, isPipeClosedError
+│   │   ├── getFilesFromDirectories.go  # Directory walking, exclusion filtering
+│   │   └── *_test.go        # Test files
+│   └── log/main.go          # Logging wrapper around stdlib slog
+├── contrib/                 # Init scripts
+│   ├── backer               # OpenRC (Alpine/Gentoo)
+│   ├── backer.service       # systemd
+│   └── backer.freebsd       # FreeBSD rc.d
+├── test_data/               # Test fixtures
+├── data/config_example.json  # Example config
+├── Makefile                 # Build targets
+├── TODO.org                 # Project backlog
+├── README.md                # User documentation
+└── LICENSE                  # MIT License
+```
+
+## Config Options
+| Option | Default | Description |
+|--------|---------|-------------|
+| address | 0.0.0.0 | Listen address |
+| port | 8086 | Listen port |
+| cert/key | - | TLS cert/key paths |
+| nohttps | false | Disable HTTPS |
+| location | /archive | API endpoint path |
+| user | - | Basic auth username (required) |
+| password | - | Basic auth password (required) |
+| log | stderr | Log output |
+| loglevel | info | Log verbosity (debug/info/warn/error) |
+| directories | - | Directories to backup (required) |
+| backup_timeout | 60 | Stream timeout in minutes (1-1440) |
+| compression_level | 9 | Gzip level (1-9) |
+| exclude_patterns | [] | Regex patterns to exclude from backup |
+
+## Key Patterns
+
+### Global Config
+Intentional design - uses global `C` variable:
+```go
+var C Config  // internal/backer/globals.go
+```
+
+### Config Parsing
+HJSON requires double conversion (hjson → map → json → struct):
+```go
+hjson.Unmarshal(buf, &tmp)  // tmp is map[string]any
+json.Marshal(tmp)
+json.Unmarshal(buf, &C)
+```
+
+### Stream Cancellation
+Context-aware write and copy functions:
+```go
+func writeWithContext(ctx context.Context, fn func() error) error
+func copyWithContext(ctx context.Context, dst io.Writer, src io.Reader) error
+```
+
+### Pipe Error Handling
+Uses `pipeErr` tracking to avoid noisy errors when reader closes early.
+Skips files that can't be read (logs warning, continues backup).
+
+### Content-Disposition Filename
+Backup filenames include timestamp: `backup-20060102-150405.tar.gz`
+
+### Special File Types
+- **Device files** (character/block) are included with correct major/minor numbers.
+- **Sockets** are skipped (no entry created).
+- **Symlinks** are stored as symlinks (target path stored).
+- **Named pipes** and other special files are included (tar header created).
+- **Regular files** are compressed; other file types have no data section.
+
+### Error Recovery
+- `writeWithContext` and `copyWithContext` recover from panics in callbacks and return an error.
+
+### Performance Notes
+- Exclude patterns are precompiled after config load for faster matching.
+- Compression level is configurable (1-9); default 9 uses more CPU.
+- Large directory walks use `filepath.WalkDir` (efficient).
+
+## Coding Style & Conventions
+
+### Function Naming
+```go
+// Exported (public): VerbNoun pattern
+NewServer()
+LoadConfig()
+CreateTarGzStream()
+GetFilesFromDirectories()
+
+// Unexported (private): verbNoun or isNoun pattern
+writeWithContext()
+copyWithContext()
+isPipeClosedError()  // predicate helper
+defaultConfigPath()
+```
+
+### JSON Tags
+Struct fields use PascalCase, json tags use snake_case:
+```go
+BackupTimeout     int `json:"backup_timeout"`
+CompressionLevel  int `json:"compression_level"`
+```
+
+### Error Messages
+- Start with capital letter (ST1005 disabled)
+- Use past tense: `"Failed to..."`, `"Unable to..."`
+- Include context: `fmt.Errorf("Failed to close %s: %w", name, err)`
+- Use `%v` for errors (not `%s`)
+
+### Logging
+- Past tense: `"Failed to close gzip writer: %v", err`
+- Context included: `"Skipping %s: %v", filename, err`
+- Appropriate level: Warn for recoverable, Error for issues, Fatal for startup failures
+
+### Config Validation Pattern
+For each config option: set default first, then immediately validate:
+```go
+// Port: set default, then validate range.
+if C.Port == 0 {
+    C.Port = 8086
+    log.Warnf("Config option port is not set, fallback to %d", C.Port)
+}
+
+if C.Port < 1 || C.Port > 65535 {
+    return fmt.Errorf("Port must be between 1 and 65535, got %d", C.Port)
+}
+```
+
+### Go Formatting
+- Tabs for indentation
+- Vim modeline at EOF: `/* vim: setlocal ft=go noet ai ts=4 sw=4 sts=4: */`
+
+### Linter Suppressions (intentional)
+| Rule | Reason |
+|------|--------|
+| ST1005 | Capitalized error messages for readability |
+| QF1001 | De Morgan's law disabled for auth condition clarity |
+| revive (error strings) | Same reason as ST1005 |
+
+### Comment Style
+- Profanity allowed (pet project)
+- Use `//nolint:` only when absolutely necessary
+
+## Testing
+```bash
+go test ./...                    # Run tests
+go test -v -run TestName ./...   # Run specific test
+golangci-lint run ./...          # Lint
+```
+
+Coverage: ~69% on internal/backer (main and log packages not covered by design)
+
+### Test Conventions
+- Reset global config: `C = Config{}`
+- Use `t.TempDir()` for temporary files
+- Helper function `writeTempConfig()` for config tests
+
+## Build
+```bash
+make           # Build binary (version from git or "dev")
+make build VERSION=0.1.0  # Build with specific version
+make clean     # Remove binary
+make test      # Run tests
+make upgrade   # Update dependencies
+make help      # Show targets
+```
+
+### Versioning
+Version is injected at build time via ldflags:
+```go
+var version = "dev"  // overridden by: -X main.version=$(VERSION)
+```
+
+## Known Issues / TODO
+See TODO.org for current backlog:
+- Consider different compression algorithms (bz2, xz, lzo, lz4)
+- Consider configurable filename prefix for content-disposition

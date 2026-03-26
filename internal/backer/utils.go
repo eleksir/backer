@@ -156,7 +156,6 @@ func CreateTarGzStream(ctx context.Context, filepaths []string) io.ReadCloser {
 					continue
 				}
 			}
-
 		}
 	}()
 

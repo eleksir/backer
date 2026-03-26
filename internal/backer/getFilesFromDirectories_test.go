@@ -15,6 +15,9 @@ func normalizePath(p string) string {
 
 // TestGetFilesFromDirectories checks if GetFilesFromDirectories returns the proper amount of strings, correct strings and no error.
 func TestGetFilesFromDirectories(t *testing.T) {
+	// Ensure empty_dir exists for the test.
+	os.MkdirAll("../../test_data/test1/foo/empty_dir", 0755)
+
 	var (
 		input = Config{
 			Directories: []string{"../../test_data/test1/foo", "../../test_data/test1/bar"},

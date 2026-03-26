@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -107,47 +108,22 @@ func NewServer(configPath string) (*http.Server, error) {
 	}, nil
 }
 
-// writeWithContext executes fn in a goroutine and returns its result.
-// If the context is canceled before fn completes, ctx.Err() is returned.
-// fn should perform I/O that will unblock when the underlying pipe is closed
-// on context cancellation (e.g., writes to a pipe writer). Panics in fn are
-// recovered and returned as errors.
+// writeWithContext checks if context is canceled before executing fn.
+// Returns ctx.Err() if context is already canceled, otherwise returns fn().
 func writeWithContext(ctx context.Context, fn func() error) error {
-	done := make(chan error, 1)
-
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				done <- fmt.Errorf("panic: %v", r)
-			}
-		}()
-
-		select {
-		case <-ctx.Done():
-			done <- ctx.Err()
-		default:
-			done <- fn()
-		}
-	}()
-
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case err := <-done:
-		return err
+	default:
 	}
+
+	return fn()
 }
 
 // copyWithContext copies data from src to dst using a 32KB buffer, respecting
 // context cancellation. If the context is canceled, the copy stops and returns
-// ctx.Err(). Panics are recovered and returned as errors.
-func copyWithContext(ctx context.Context, dst io.Writer, src io.Reader) (err error) { //nolint:nonamedreturns
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("panic: %v", r)
-		}
-	}()
-
+// ctx.Err().
+func copyWithContext(ctx context.Context, dst io.Writer, src io.Reader) error {
 	buf := make([]byte, 32*1024)
 
 	for {
@@ -178,15 +154,15 @@ func copyWithContext(ctx context.Context, dst io.Writer, src io.Reader) (err err
 // It checks X-Forwarded-For header first (for proxied requests), then falls back to RemoteAddr.
 func getClientIP(r *http.Request) string {
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		return strings.Split(xff, ",")[0]
+		return strings.TrimSpace(strings.Split(xff, ",")[0])
 	}
 
-	ip := r.RemoteAddr
-	if colon := strings.LastIndex(ip, ":"); colon != -1 {
-		return ip[:colon]
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
 	}
 
-	return ip
+	return host
 }
 
 /* vim: setlocal ft=go noet ai ts=4 sw=4 sts=4: */

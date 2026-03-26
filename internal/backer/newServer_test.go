@@ -338,37 +338,4 @@ func TestCopyWithContextCancellation(t *testing.T) {
 	}
 }
 
-func TestWriteWithContextPanic(t *testing.T) {
-	ctx := context.Background()
-	err := writeWithContext(ctx, func() error {
-		panic("test panic")
-	})
-	if err == nil {
-		t.Error("Expected error from panic, got nil")
-	}
-	if !strings.Contains(err.Error(), "panic") {
-		t.Errorf("Expected panic error, got %v", err)
-	}
-}
-
-func TestCopyWithContextPanic(t *testing.T) {
-	ctx := context.Background()
-	// Use a reader that panics on Read
-	panicReader := &panicReader{}
-	dst := &strings.Builder{}
-	err := copyWithContext(ctx, dst, panicReader)
-	if err == nil {
-		t.Error("Expected error from panic, got nil")
-	}
-	if !strings.Contains(err.Error(), "panic") {
-		t.Errorf("Expected panic error, got %v", err)
-	}
-}
-
-type panicReader struct{}
-
-func (pr *panicReader) Read(p []byte) (n int, err error) {
-	panic("read panic")
-}
-
 /* vim: setlocal ft=go noet ai ts=4 sw=4 sts=4: */

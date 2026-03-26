@@ -82,9 +82,9 @@ func Init(level, filename string) error {
 	return err
 }
 
-// Error passes message directly to [slog.Error()].
-func Error(message string) {
-	slog.Error(message)
+// Error logs args at error level using [slog.Error()].
+func Error(args ...any) {
+	slog.Error(fmt.Sprint(args...))
 }
 
 // Errorf logs message on error log level and allows to supply arguments in printf() style.
@@ -92,9 +92,9 @@ func Errorf(format string, a ...any) {
 	slog.Error(fmt.Sprintf(format, a...))
 }
 
-// Warn passes message directly to [slog.Warn()].
-func Warn(message string) {
-	slog.Warn(message)
+// Warn logs args at warn level using [slog.Warn()].
+func Warn(args ...any) {
+	slog.Warn(fmt.Sprint(args...))
 }
 
 // Warnf logs message on warn log level and allows to supply arguments in printf() style.
@@ -102,9 +102,9 @@ func Warnf(format string, a ...any) {
 	slog.Warn(fmt.Sprintf(format, a...))
 }
 
-// Info passes message directly to [slog.Info()].
-func Info(message string) {
-	slog.Info(message)
+// Info logs args at info level using [slog.Info()].
+func Info(args ...any) {
+	slog.Info(fmt.Sprint(args...))
 }
 
 // Infof logs message on info log level and allows to supply arguments in printf() style.
@@ -112,9 +112,9 @@ func Infof(format string, a ...any) {
 	slog.Info(fmt.Sprintf(format, a...))
 }
 
-// Debug passes message directly to [slog.Debug()].
-func Debug(message string) {
-	slog.Debug(message)
+// Debug logs args at debug level using [slog.Debug()].
+func Debug(args ...any) {
+	slog.Debug(fmt.Sprint(args...))
 }
 
 // Debugf logs message on debug log level and allows to supply arguments in printf() style.
@@ -122,9 +122,9 @@ func Debugf(format string, a ...any) {
 	slog.Debug(fmt.Sprintf(format, a...))
 }
 
-// Fatal passes message directly to [slog.Error()] and quits with status code 1.
-func Fatal(message string) {
-	slog.Error(message)
+// Fatal logs args at error level and quits with status code 1.
+func Fatal(args ...any) {
+	slog.Error(fmt.Sprint(args...))
 	Close()
 	os.Exit(1)
 }
@@ -139,6 +139,10 @@ func Fatalf(format string, a ...any) {
 
 // Close closes log file descriptor.
 func Close() {
+	if Log == nil || Log == os.Stderr {
+		return
+	}
+
 	if err := Log.Close(); err != nil {
 		msg := fmt.Sprintln("Failed to close log file:", err)
 		slog.Error(msg)

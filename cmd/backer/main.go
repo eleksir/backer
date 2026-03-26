@@ -10,8 +10,6 @@ import (
 
 	"backer/internal/backer"
 	"backer/internal/log"
-
-	"github.com/pkg/errors"
 )
 
 var (
@@ -39,14 +37,14 @@ func main() {
 	server, err := backer.NewServer(cfgPath)
 
 	if err != nil {
-		log.Fatalf("Failed to create server: %v", errors.WithStack(err))
+		log.Fatalf("Failed to create server: %v", err)
 	}
 
 	log.Infof("Starting server at %s", server.Addr)
 
 	if backer.C.NoHTTPS {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Failed to start server: %v", errors.WithStack(err))
+			log.Fatalf("Failed to start server: %v", err)
 		}
 	} else {
 		if _, err := os.Stat(backer.C.Cert); err != nil {
@@ -58,7 +56,7 @@ func main() {
 		}
 
 		if err := server.ListenAndServeTLS(backer.C.Cert, backer.C.Key); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Failed to start server: %v", errors.WithStack(err))
+			log.Fatalf("Failed to start server: %v", err)
 		}
 	}
 }

@@ -9,9 +9,12 @@ import (
 )
 
 // isExcluded checks if path matches any of the configured exclude patterns.
+// Paths are normalized to forward slashes for cross-platform regex matching.
 func isExcluded(path string) bool {
+	normalized := filepath.ToSlash(path)
+
 	for _, re := range excludePatterns {
-		if re.MatchString(path) {
+		if re.MatchString(normalized) {
 			return true
 		}
 	}

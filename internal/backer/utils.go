@@ -100,7 +100,7 @@ func CreateTarGzStream(ctx context.Context, filepaths []string) io.ReadCloser {
 				linkTarget, err = os.Readlink(fpath)
 
 				if err != nil {
-					log.Warnf("Skipping %s: readlink failed: %s", fpath, err)
+					log.Warnf("Skipping %s: readlink failed: %v", fpath, err)
 
 					continue
 				}

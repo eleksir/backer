@@ -23,6 +23,8 @@ func withServerHeader(next http.Handler) http.Handler {
 
 // NewServer starts new server instance with given config file.
 func NewServer(configPath string) (*http.Server, error) {
+	_ = log.Init("info", "") // Initialize logger with defaults for early logging.
+
 	if err := LoadConfig(configPath); err != nil {
 		return nil, fmt.Errorf("Failed to load config: %w", err)
 	}

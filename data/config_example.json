@@ -47,6 +47,6 @@
     /* Prefix for backup filename in Content-Disposition header.                                                      */
     "filename_prefix": "backup",
 
-    /* Compression algorithm: gzip or bzip2.                                                                         */
+    /* Compression algorithm: gzip, bzip2 or zstd.                                                                    */
     "compression_algorithm": "gzip"
 }

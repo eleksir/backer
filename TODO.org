@@ -8,6 +8,9 @@
    - [X] Evaluate alternatives to gzip: bz2, xz, lzo, lz4
    - CANCELLED lzo. It has cgo implementaion which depends in liblzo, and native lid that does not support streaming. 
    - [X] Implemented bzip2 as alternative (pure Go, via github.com/dsnet/compress)
+   - [ ] Implement xz as another alternative (pure Go, via github.com/ulikunitz/xz)
+   - [X] Implement zstd as another alternative (pure Go, via github.com/klauspost/compress/zstd)
+   - [ ] Implement lz4 as another alternative (pure Go, via github.com/pierrec/lz4)
    - [X] Add compression_algorithm config option
 
 ** DONE Configurable filename prefix

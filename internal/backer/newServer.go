@@ -78,10 +78,16 @@ func NewServer(configPath string) (*http.Server, error) {
 			extension string
 		)
 
-		if C.CompressionAlgorithm == "bzip2" {
+		switch C.CompressionAlgorithm {
+		case "bzip2":
 			archive = CreateTarBzip2Stream(ctx, files)
 			extension = "tar.bz2"
-		} else {
+
+		case "zstd":
+			archive = CreateTarZstdStream(ctx, files)
+			extension = "tar.zst"
+
+		default:
 			archive = CreateTarGzStream(ctx, files)
 			extension = "tar.gz"
 		}

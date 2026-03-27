@@ -13,6 +13,7 @@ import (
 	"backer/internal/log"
 
 	"github.com/dsnet/compress/bzip2"
+	"github.com/klauspost/compress/zstd"
 )
 
 // CreateTarGzStream takes a list of files and returns a reader that reads from a tar archive containing these files.
@@ -204,6 +205,157 @@ func CreateTarBzip2Stream(ctx context.Context, filepaths []string) io.ReadCloser
 		}()
 
 		tw := tar.NewWriter(bw)
+
+		defer func() {
+			if pipeErr == nil {
+				if err := tw.Close(); err != nil {
+					if !isPipeClosedError(err) {
+						log.Errorf("Failed to close tar writer: %v", err)
+					}
+				}
+			}
+		}()
+
+		for _, fpath := range filepaths {
+			var (
+				err        error
+				linkTarget string
+			)
+
+			select {
+			case <-ctx.Done():
+				closePipeWithError(ctx.Err())
+
+				return
+
+			default:
+			}
+
+			log.Debugf("Adding file: %s", fpath)
+
+			st, err := os.Lstat(fpath)
+
+			if err != nil {
+				log.Warnf("Skipping %s: %v", fpath, err)
+
+				continue
+			}
+
+			if st.Mode()&os.ModeSymlink != 0 {
+				linkTarget, err = os.Readlink(fpath)
+
+				if err != nil {
+					log.Warnf("Skipping %s: readlink failed: %v", fpath, err)
+
+					continue
+				}
+			}
+
+			if st.Mode()&os.ModeSocket != 0 {
+				log.Debugf("Skipping socket: %s", fpath)
+
+				continue
+			}
+
+			header, err := tar.FileInfoHeader(st, linkTarget)
+
+			if err != nil {
+				log.Warnf("Skipping %s: tar header failed: %v", fpath, err)
+
+				continue
+			}
+
+			header.Format = tar.FormatGNU
+			header.Name = strings.TrimPrefix(filepath.ToSlash(filepath.Clean(fpath)), "/")
+
+			mode := st.Mode()
+
+			if err := writeWithContext(ctx, func() error {
+				return tw.WriteHeader(header)
+			}); err != nil {
+				closePipeWithError(err)
+
+				return
+			}
+
+			if mode.IsRegular() {
+				f, err := os.Open(fpath)
+				if err != nil {
+					log.Warnf("Skipping %s: open failed: %v", fpath, err)
+
+					continue
+				}
+
+				err = copyWithContext(ctx, tw, f)
+
+				if e := f.Close(); e != nil {
+					log.Warnf("Failed to close file %s: %v", fpath, e)
+				}
+
+				if err != nil {
+					log.Warnf("Skipping %s: copy failed: %v", fpath, err)
+
+					continue
+				}
+			}
+		}
+	}()
+
+	return pr
+}
+
+// zstdLevel returns the zstd encoder level based on the 1-9 compression level.
+func zstdLevel(level int) zstd.EncoderLevel {
+	switch {
+	case level <= 3:
+		return zstd.SpeedFastest
+	case level <= 6:
+		return zstd.SpeedDefault
+	default:
+		return zstd.SpeedBetterCompression
+	}
+}
+
+// CreateTarZstdStream takes a list of files and returns a reader that reads from a zstd-compressed tar archive.
+func CreateTarZstdStream(ctx context.Context, filepaths []string) io.ReadCloser {
+	pr, pw := io.Pipe()
+
+	go func() {
+		var pipeErr error
+
+		closePipeWithError := func(err error) {
+			if pipeErr != nil {
+				return
+			}
+
+			pipeErr = err
+			pw.CloseWithError(err)
+		}
+
+		defer func() {
+			if pipeErr == nil {
+				pw.Close()
+			}
+		}()
+
+		zw, err := zstd.NewWriter(pw, zstd.WithEncoderLevel(zstdLevel(C.CompressionLevel)))
+		if err != nil {
+			closePipeWithError(fmt.Errorf("zstd writer error: %w", err))
+
+			return
+		}
+
+		defer func() {
+			if pipeErr == nil {
+				if err := zw.Close(); err != nil {
+					if !isPipeClosedError(err) {
+						log.Errorf("Failed to close zstd writer: %v", err)
+					}
+				}
+			}
+		}()
+
+		tw := tar.NewWriter(zw)
 
 		defer func() {
 			if pipeErr == nil {

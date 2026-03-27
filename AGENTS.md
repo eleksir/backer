@@ -182,7 +182,7 @@ Config is JSON (HJSON with comments supported). Default path depends on OS:
 | compression_level | `9` | Gzip level (1-9) |
 | exclude_patterns | `[]` | Regex patterns to exclude from backup |
 | filename_prefix | `backup` | Prefix for backup filename in Content-Disposition header |
-| compression_algorithm | `gzip` | Compression algorithm: gzip or bzip2 |
+| compression_algorithm | `gzip` | Compression algorithm: gzip, bzip2 or zstd |
 
 ## Architecture & Key Patterns
 

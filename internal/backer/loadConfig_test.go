@@ -253,6 +253,27 @@ func TestLoadConfigCompressionAlgorithmBzip2(t *testing.T) {
 	}
 }
 
+// TestLoadConfigCompressionAlgorithmZstd tests zstd compression algorithm.
+func TestLoadConfigCompressionAlgorithmZstd(t *testing.T) {
+	config := `{
+		"user": "test",
+		"password": "test",
+		"directories": ["../../test_data/test1/foo"],
+		"nohttps": true,
+		"compression_algorithm": "zstd"
+	}`
+	tmpFile := writeTempConfig(t, config)
+
+	err := LoadConfig(tmpFile)
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+
+	if C.CompressionAlgorithm != "zstd" {
+		t.Errorf("C.CompressionAlgorithm should be zstd, got %s", C.CompressionAlgorithm)
+	}
+}
+
 // TestLoadConfigCompressionAlgorithmInvalid tests invalid compression algorithm.
 func TestLoadConfigCompressionAlgorithmInvalid(t *testing.T) {
 	config := `{

@@ -9,8 +9,9 @@
    - CANCELLED lzo. It has cgo implementaion which depends in liblzo, and native lid that does not support streaming. 
    - [X] Implemented bzip2 as alternative (pure Go, via github.com/dsnet/compress)
    - [X] Implemented zstd as alternative (pure Go, via github.com/klauspost/compress/zstd)
+   - [X] Implemented lz4 as alternative (pure Go, via github.com/pierrec/lz4)
+   - [X] Implemented xz as alternative (pure Go, via github.com/ulikunitz/xz)
    - [X] Add compression_algorithm config option
-   - Note: xz and lz4 can be added later if needed (pure Go libs available)
 
 ** DONE Configurable filename prefix
    - [X] Move "backup" prefix to config (currently hardcoded in newServer.go)

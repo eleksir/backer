@@ -122,7 +122,7 @@ func CreateTarGzStream(ctx context.Context, filepaths []string) io.ReadCloser {
 			}
 
 			header.Format = tar.FormatGNU
-			header.Name = strings.TrimPrefix(filepath.Clean(fpath), string(filepath.Separator))
+			header.Name = strings.TrimPrefix(filepath.ToSlash(filepath.Clean(fpath)), "/")
 
 			mode := st.Mode()
 

@@ -99,6 +99,17 @@ func NewServer(configPath string) (*http.Server, error) {
 		log.Infof("Backup completed: client=%s user=%s files=%d bytes=%d duration=%s", clientIP, username, len(files), bytesWritten, duration)
 	})
 
+	// Decision about which mode (http or https) to run made in cmd/backer/main.go, where we run server.ListenAndServe()
+	// or server.ListenAndServeTLS() depending on value of C.NoHTTPS.
+	if C.NoHTTPS {
+		return &http.Server{
+			Addr:              fmt.Sprintf("%s:%d", C.Address, C.Port),
+			Handler:           withServerHeader(mux),
+			ReadHeaderTimeout: 5 * time.Second,
+			WriteTimeout:      time.Duration(C.BackupTimeout) * time.Minute,
+		}, nil
+	}
+
 	return &http.Server{
 		Addr:              fmt.Sprintf("%s:%d", C.Address, C.Port),
 		Handler:           withServerHeader(mux),

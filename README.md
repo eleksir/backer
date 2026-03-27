@@ -57,7 +57,7 @@ AI suggests to fill this section with useful information, despite that all optio
 | compression_level | 9 | Gzip compression level for tar.gz archives. | 1 (fastest) to 9 (best compression). Higher values produce smaller files but take longer to compress. |
 | exclude_patterns | [] | Regex patterns to exclude from backup. | E.g., `[".*\\.tmp$", "/node_modules/"]`. Files matching any pattern are skipped. |
 | filename_prefix | "backup" | Prefix for backup filename in Content-Disposition header. | E.g., "mybackup" produces `mybackup-20260325-092341.tar.gz`. |
-| compression_algorithm | "gzip" | Compression algorithm for archive. | Options: "gzip", "bzip2", "zstd". Gzip is fastest, bzip2 compresses better, zstd is a good balance. |
+| compression_algorithm | "gzip" | Compression algorithm for archive. | Options: "gzip", "bzip2", "zstd", "lz4". Gzip is fastest, bzip2 compresses best, zstd is balanced, lz4 is very fast with moderate compression. |
 
 ## Best practices
 

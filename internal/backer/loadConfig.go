@@ -142,8 +142,8 @@ func LoadConfig(path string) error {
 		log.Warnf("Config option compression_algorithm is not set, fallback to %s", C.CompressionAlgorithm)
 	}
 
-	if C.CompressionAlgorithm != "gzip" && C.CompressionAlgorithm != "bzip2" && C.CompressionAlgorithm != "zstd" {
-		return fmt.Errorf("Compression_algorithm must be gzip, bzip2 or zstd, got %s", C.CompressionAlgorithm)
+	if C.CompressionAlgorithm != "gzip" && C.CompressionAlgorithm != "bzip2" && C.CompressionAlgorithm != "zstd" && C.CompressionAlgorithm != "lz4" {
+		return fmt.Errorf("Compression_algorithm must be gzip, bzip2, zstd or lz4, got %s", C.CompressionAlgorithm)
 	}
 
 	// Compile exclude patterns.

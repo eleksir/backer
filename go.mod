@@ -7,4 +7,5 @@ require github.com/hjson/hjson-go v3.3.0+incompatible
 require (
 	github.com/dsnet/compress v0.0.1 // indirect
 	github.com/klauspost/compress v1.18.5 // indirect
+	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
 )

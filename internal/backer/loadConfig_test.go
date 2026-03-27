@@ -274,6 +274,27 @@ func TestLoadConfigCompressionAlgorithmZstd(t *testing.T) {
 	}
 }
 
+// TestLoadConfigCompressionAlgorithmLz4 tests lz4 compression algorithm.
+func TestLoadConfigCompressionAlgorithmLz4(t *testing.T) {
+	config := `{
+		"user": "test",
+		"password": "test",
+		"directories": ["../../test_data/test1/foo"],
+		"nohttps": true,
+		"compression_algorithm": "lz4"
+	}`
+	tmpFile := writeTempConfig(t, config)
+
+	err := LoadConfig(tmpFile)
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+
+	if C.CompressionAlgorithm != "lz4" {
+		t.Errorf("C.CompressionAlgorithm should be lz4, got %s", C.CompressionAlgorithm)
+	}
+}
+
 // TestLoadConfigCompressionAlgorithmInvalid tests invalid compression algorithm.
 func TestLoadConfigCompressionAlgorithmInvalid(t *testing.T) {
 	config := `{

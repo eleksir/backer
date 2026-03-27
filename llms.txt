@@ -62,7 +62,7 @@ curl -u user:pass https://server:8086/archive -o backup.tar.gz
 | compression_level | 9 | Gzip level (1-9) |
 | exclude_patterns | [] | Regex patterns to exclude from backup |
 | filename_prefix | backup | Prefix for backup filename in Content-Disposition header |
-| compression_algorithm | gzip | Compression algorithm (gzip, bzip2 or zstd) |
+| compression_algorithm | gzip | Compression algorithm (gzip, bzip2, zstd or lz4) |
 
 ## Key Patterns
 

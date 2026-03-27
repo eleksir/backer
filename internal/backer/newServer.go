@@ -95,6 +95,10 @@ func NewServer(configPath string) (*http.Server, error) {
 			archive = CreateTarXzStream(ctx, files)
 			extension = "tar.xz"
 
+		case "pgzip":
+			archive = CreateTarPgzipStream(ctx, files)
+			extension = "tar.gz"
+
 		default:
 			archive = CreateTarGzStream(ctx, files)
 			extension = "tar.gz"

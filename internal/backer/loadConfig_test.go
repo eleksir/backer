@@ -316,6 +316,27 @@ func TestLoadConfigCompressionAlgorithmXz(t *testing.T) {
 	}
 }
 
+// TestLoadConfigCompressionAlgorithmPgzip tests pgzip compression algorithm.
+func TestLoadConfigCompressionAlgorithmPgzip(t *testing.T) {
+	config := `{
+		"user": "test",
+		"password": "test",
+		"directories": ["../../test_data/test1/foo"],
+		"nohttps": true,
+		"compression_algorithm": "pgzip"
+	}`
+	tmpFile := writeTempConfig(t, config)
+
+	err := LoadConfig(tmpFile)
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+
+	if C.CompressionAlgorithm != "pgzip" {
+		t.Errorf("C.CompressionAlgorithm should be pgzip, got %s", C.CompressionAlgorithm)
+	}
+}
+
 // TestLoadConfigCompressionAlgorithmInvalid tests invalid compression algorithm.
 func TestLoadConfigCompressionAlgorithmInvalid(t *testing.T) {
 	config := `{

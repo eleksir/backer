@@ -1,6 +1,6 @@
 # Backer
 
-Kind of backup utility. It makes tar.gz on-the-fly out of given in config.json files.
+HTTP/HTTPS backup server that creates compressed archives on-the-fly from configured directories. Supports multiple compression algorithms: gzip, pgzip, bzip2, zstd, lz4, xz.
 
 ## How to build it
 
@@ -8,9 +8,8 @@ Kind of backup utility. It makes tar.gz on-the-fly out of given in config.json f
 make                                    # Build binary
 make build VERSION=0.1.0                # Build with version
 make test                               # Run tests
-backer                                  # Run
-backer --version                        # Show version
-backer -c /path/to/config.json          # Custom config
+make                                    # Clean + build
+make upgrade                            # Update dependencies
 ```
 
 That will produce binary named `backer`. Copy it somewhere in `/usr/local/sbin/backer`, for example. In `data`
@@ -32,32 +31,43 @@ Build, install and configure backer. On your backup storage server you can do
 curl -u username:password https://your_server:8086/archive -o "backup-$(date +%Y%m%d-%H%M%S).tar.gz"
 ```
 
-and you'll get your backup with timestamp in filename, like `backup-20260325-105100.tar.gz`
+The filename and extension depend on your `filename_prefix` and `compression_algorithm` settings.
 
 Of course, something can go wrong, so you must check http status code after downloading backup.
 
 ## About config options
 
-AI suggests to fill this section with useful information, despite that all options described in example config.
+All options described in example config.
 
 | Option | Default value | Wtf | Notes |
 | :--- | :---- | :--- | :--- |
 | address | "0.0.0.0" | Address at which server listens. | In many cases 0.0.0.0 is okay. |
-| port | 8086 | Port at which server binds | Number picked after intel first comercially successful cpu. |
-| cert | "/path/to/ssl.crt" | Path to ssl certificate file | It is not enforced in obvious form, but you should limit access to certificate at least with file permissions. |
-| key | "/path/to/ssl.key" | Path to ssl certificates key file | It is not enforced in obvious form, but you should limit access to certificates key at least with file permissions. |
-| nohttps | false | ability to disable https and use plain http. | This option is for lab experiments or for development needs. In case of this utility you should consider using long enough certificate with well ciphers. |
-| location | "/archive" | This is static location where curl (or more sophisticated client) should aim to download backup | /archive is okay, but you free to choose something more wild like "/backup", just for giggles. |
-| user | | You should pick up some flashy username for basic auth to prevent unauthorized access to your backup. | Enough said. |
-| password | | You should pick up something super-duper secretous to prevent unauthorized access to your backup. | Enough said. |
-| log | stderr | Where log messages are directed. If no value set, logs drops to stderr | |
-| loglevel | | Verbosity of logs. | Can be error, warn, info, debug. Pick whatever you like. |
-| directories | | An array with directories. Backer can work only with directories, not single files. | Put here all the folders you'd like to backup! |
-| backup_timeout | 60 | Timeout in minutes for backup streaming operations. | If a backup takes longer than this, the connection will be terminated. Useful for large backups. Range: 1-1440 minutes (1 day max). |
-| compression_level | 9 | Gzip compression level for tar.gz archives. | 1 (fastest) to 9 (best compression). Higher values produce smaller files but take longer to compress. |
-| exclude_patterns | [] | Regex patterns to exclude from backup. | E.g., `[".*\\.tmp$", "/node_modules/"]`. Files matching any pattern are skipped. |
-| filename_prefix | "backup" | Prefix for backup filename in Content-Disposition header. | E.g., "mybackup" produces `mybackup-20260325-092341.tar.gz`. |
-| compression_algorithm | "gzip" | Compression algorithm for archive. | Options: "gzip", "bzip2", "zstd", "lz4", "xz". Gzip is fastest, lz4 is very fast, zstd is balanced, bzip2 and xz compress best (xz is slowest). |
+| port | 8086 | Port at which server binds. | Number picked after intel first commercially successful cpu. |
+| cert | — | Path to ssl certificate file. | Required when nohttps is false. |
+| key | — | Path to ssl certificates key file. | Required when nohttps is false. |
+| nohttps | false | Disable https and use plain http. | For lab experiments or development. |
+| location | "/archive" | API endpoint path for backup download. | |
+| user | — | Username for basic auth. | Required. |
+| password | — | Password for basic auth. | Required. |
+| log | stderr | Log output file path. | |
+| loglevel | "info" | Verbosity of logs. | Options: error, warn, info, debug. |
+| directories | — | Directories to backup. | Required. Array of paths. |
+| backup_timeout | 60 | Timeout in minutes for backup streaming. | Range: 1-1440 minutes. |
+| compression_level | 9 | Compression level. | 1 (fastest) to 9 (best compression). |
+| exclude_patterns | [] | Regex patterns to exclude from backup. | E.g., `[".*\\.tmp$", "/node_modules/"]`. |
+| filename_prefix | "backup" | Prefix for backup filename. | E.g., "mybackup" produces `mybackup-20260325-092341.tar.gz`. |
+| compression_algorithm | "gzip" | Compression algorithm. | Options: gzip, pgzip, bzip2, zstd, lz4, xz. |
+
+## Compression algorithms
+
+| Algorithm | Speed | Compression | Notes |
+| :--- | :--- | :--- | :--- |
+| gzip | Fast | Good | Default. Standard, widely compatible. |
+| pgzip | Fast | Good | Parallel gzip. Uses multiple CPU cores, slightly larger files. |
+| bzip2 | Slow | Better | Pure Go. Good compression, slower than gzip. |
+| zstd | Fast | Very good | Good balance of speed and compression. |
+| lz4 | Fastest | Moderate | Extremely fast, larger files. |
+| xz | Slowest | Best | Best compression, slowest speed. |
 
 ## Best practices
 

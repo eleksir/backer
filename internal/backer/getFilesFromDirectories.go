@@ -1,4 +1,3 @@
-// Package backer implements simple backup server.
 package backer
 
 import (

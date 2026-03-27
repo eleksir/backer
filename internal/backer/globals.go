@@ -6,8 +6,11 @@ import (
 
 var (
 	// C contains the global configuration loaded from config file.
+	// This is intentional — config is loaded once at startup and never modified concurrently.
 	C Config
+
 	// excludePatterns contains compiled regex patterns from C.ExcludePatterns.
+	// Populated by LoadConfig, used by isExcluded during directory walking.
 	excludePatterns []*regexp.Regexp
 )
 

@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Backer is a Go-based HTTP/HTTPS backup server that creates `tar.gz` archives on-the-fly from configured directories. It serves a single endpoint that clients (e.g., `curl`) can query to download a timestamped backup archive. Licensed under MIT.
+Backer is a Go-based HTTP/HTTPS backup server that creates compressed archives on-the-fly from configured directories. Supports multiple compression algorithms: gzip, pgzip, bzip2, zstd, lz4, xz. It serves a single endpoint that clients (e.g., `curl`) can query to download a timestamped backup archive. Licensed under MIT.
 
 ## Workflow Rules
 
@@ -11,7 +11,7 @@ Backer is a Go-based HTTP/HTTPS backup server that creates `tar.gz` archives on-
 - **When stuck, ask a clarification question, or propose a short plan, or both.** Do not guess intent or make assumptions — ask.
 - **Always make a TODO plan before acting. And try to follow this plan.**
 - **If you notice defects, bugs, or issues, always report it.**
-- **Track new features, known issues, bugs, and other defects in `TODO.org`.** Update it as you implement features, fix issues, fix bugs, or discover new ones — check off completed items, add new findings.
+- **Track new features, known issues, bugs, and other defects.** Update documentation as you implement features, fix issues, fix bugs, or discover new ones.
 - **Update `AGENTS.md` as the project evolves.** Keep it comprehensive but dense.
 - **Don't use `context` package unless absolutely necessary.** Try to find another solution first.
 - **Create unit tests if possible/necessary** to verify changes that are not covered by unit tests.
@@ -76,8 +76,8 @@ if C.Port == 0 {
     log.Warnf("Config option port is not set, fallback to %d", C.Port)
 }
 
-if C.Port < 1 || C.Port > 65535 {
-    return fmt.Errorf("Port must be between 1 and 65535, got %d", C.Port)
+if C.Port < portMin || C.Port > portMax {
+    return fmt.Errorf("Config option port must be between %d and %d, got %d", portMin, portMax, C.Port)
 }
 ```
 
@@ -123,15 +123,21 @@ cmd/
 internal/
   backer/
     types.go                        # Config struct definition
+    consts.go                       # Named constants for magic numbers
     globals.go                      # Global C Config variable, compiled excludePatterns
+    archive.go                      # Common archive logic (pipe, tar, file iteration)
+    gzip.go                         # CreateTarGzStream, CreateTarPgzipStream
+    bzip2.go                        # CreateTarBzip2Stream
+    zstd.go                         # CreateTarZstdStream, zstdLevel helper
+    lz4.go                          # CreateTarLz4Stream
+    xz.go                           # CreateTarXzStream
     loadConfig.go                   # HJSON/JSON config parsing with validation
     loadConfig_test.go              # Config validation tests
     newServer.go                    # HTTP server creation, auth handler, context helpers
     newServer_test.go               # Server, auth, and context helper tests
-    utils.go                        # CreateTarGzStream (tar.gz streaming via io.Pipe)
-    utils_test.go                   # Tar.gz stream tests
     getFilesFromDirectories.go      # Directory walking, exclusion filtering (isExcluded)
     getFilesFromDirectories_test.go # File traversal and exclude pattern tests
+    utils_test.go                   # Archive stream tests
   log/
     main.go                         # Logging wrapper around stdlib slog
     main_test.go                    # Log package tests
@@ -150,7 +156,6 @@ test_data/
   test1/                            # File/directory fixtures for tests
 
 Makefile                            # Build targets
-TODO.org                            # Project backlog (Org mode)
 README.md                           # User documentation
 LICENSE                             # MIT License
 llms.txt                            # LLM-friendly project reference
@@ -201,9 +206,10 @@ json.Unmarshal(buf, &C)     // decode into Config struct
 
 ### Streaming Archive Creation
 
-No temp files on disk. Uses `io.Pipe` with a goroutine to stream tar.gz on-the-fly:
-- `CreateTarGzStream()` returns an `io.ReadCloser`
-- Goroutine writes tar entries → gzip writer → pipe writer
+No temp files on disk. Uses `io.Pipe` with a goroutine to stream archives on-the-fly:
+- Common logic in `archive.go`: `createArchiveStream()` handles pipe, goroutine, tar writing, file iteration
+- Each compression algorithm has its own file: `gzip.go`, `bzip2.go`, `zstd.go`, `lz4.go`, `xz.go`
+- All return an `io.ReadCloser`
 - HTTP handler copies from pipe reader directly to HTTP response
 
 ### Context-Aware I/O
@@ -242,6 +248,11 @@ Checks `X-Forwarded-For` header first (for proxied requests), then falls back to
 ## Dependencies
 
 - `github.com/hjson/hjson-go` v3.3.0 — HJSON config parsing
+- `github.com/dsnet/compress` v0.0.1 — bzip2 compression
+- `github.com/klauspost/compress` v1.18.5 — zstd compression
+- `github.com/klauspost/pgzip` v1.2.6 — parallel gzip compression
+- `github.com/pierrec/lz4` v2.6.1 — lz4 compression
+- `github.com/ulikunitz/xz` v0.5.15 — xz compression
 
 ## Testing
 
@@ -275,7 +286,3 @@ Init scripts provided in `contrib/`:
 - **systemd** (`backer.service`): `ExecStart=/usr/local/sbin/backer`, restart on failure
 - **OpenRC** (`backer`): uses `supervise-daemon`, creates log/pid dirs in `start_pre`
 - **FreeBSD rc.d** (`backer.freebsd`): daemonizes via `/usr/sbin/daemon`
-
-## TODO / Roadmap
-
-See `TODO.org` for current backlog.

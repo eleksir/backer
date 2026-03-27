@@ -134,7 +134,18 @@ func NewServer(configPath string) (*http.Server, error) {
 		return &http.Server{
 			Addr:              fmt.Sprintf("%s:%d", C.Address, C.Port),
 			Handler:           withServerHeader(mux),
-			ReadHeaderTimeout: 5 * time.Second,
+			ReadHeaderTimeout: readHeaderTimeout,
+			WriteTimeout:      time.Duration(C.BackupTimeout) * time.Minute,
+		}, nil
+	}
+
+	// Decision about which mode (http or https) to run made in cmd/backer/main.go, where we run server.ListenAndServe()
+	// or server.ListenAndServeTLS() depending on value of C.NoHTTPS.
+	if C.NoHTTPS {
+		return &http.Server{
+			Addr:              fmt.Sprintf("%s:%d", C.Address, C.Port),
+			Handler:           withServerHeader(mux),
+			ReadHeaderTimeout: readHeaderTimeout,
 			WriteTimeout:      time.Duration(C.BackupTimeout) * time.Minute,
 		}, nil
 	}
@@ -166,7 +177,7 @@ func writeWithContext(ctx context.Context, fn func() error) error {
 // context cancellation. If the context is canceled, the copy stops and returns
 // ctx.Err().
 func copyWithContext(ctx context.Context, dst io.Writer, src io.Reader) error {
-	buf := make([]byte, 32*1024)
+	buf := make([]byte, copyBufferSize)
 
 	for {
 		select {

@@ -1,7 +1,7 @@
 # llms.txt for Backer
 
 ## Overview
-Backer is a Go-based backup utility that creates tar.gz archives on-the-fly and serves them via HTTP/HTTPS with basic authentication.
+Backer is a Go-based backup utility that creates compressed archives on-the-fly and serves them via HTTP/HTTPS with basic authentication. Supports gzip, pgzip, bzip2, zstd, lz4, xz compression.
 
 ## Quick Start
 ```bash
@@ -26,10 +26,16 @@ curl -u user:pass https://server:8086/archive -o backup.tar.gz
 ├── internal/
 │   ├── backer/              # Core logic
 │   │   ├── types.go         # Config struct definition
+│   │   ├── consts.go        # Named constants for magic numbers
 │   │   ├── globals.go       # Global C Config variable
+│   │   ├── archive.go       # Common archive logic (createArchiveStream, writeFilesToTar)
+│   │   ├── gzip.go          # CreateTarGzStream, CreateTarPgzipStream
+│   │   ├── bzip2.go         # CreateTarBzip2Stream
+│   │   ├── zstd.go          # CreateTarZstdStream
+│   │   ├── lz4.go           # CreateTarLz4Stream
+│   │   ├── xz.go            # CreateTarXzStream
 │   │   ├── loadConfig.go    # HJSON/JSON config parsing with validation
 │   │   ├── newServer.go     # HTTP server, auth handler, context helpers
-│   │   ├── utils.go         # CreateTarGzStream, isPipeClosedError
 │   │   ├── getFilesFromDirectories.go  # Directory walking, exclusion filtering
 │   │   └── *_test.go        # Test files
 │   └── log/main.go          # Logging wrapper around stdlib slog
@@ -40,7 +46,6 @@ curl -u user:pass https://server:8086/archive -o backup.tar.gz
 ├── test_data/               # Test fixtures
 ├── data/config_example.json  # Example config
 ├── Makefile                 # Build targets
-├── TODO.org                 # Project backlog
 ├── README.md                # User documentation
 └── LICENSE                  # MIT License
 ```
@@ -92,7 +97,7 @@ Uses `pipeErr` tracking to avoid noisy errors when reader closes early.
 Skips files that can't be read (logs warning, continues backup).
 
 ### Content-Disposition Filename
-Backup filenames include timestamp: `backup-20060102-150405.tar.gz`
+Backup filenames include timestamp and configured prefix: `backup-20060102-150405.tar.gz` (extension depends on compression_algorithm).
 
 ### Special File Types
 - **Device files** (character/block) are included with correct major/minor numbers.
@@ -102,7 +107,8 @@ Backup filenames include timestamp: `backup-20060102-150405.tar.gz`
 - **Regular files** are compressed; other file types have no data section.
 
 ### Error Recovery
-- `writeWithContext` and `copyWithContext` recover from panics in callbacks and return an error.
+- `writeWithContext` checks context before calling fn.
+- `copyWithContext` does buffered copy with cancellation checks.
 
 ### Performance Notes
 - Exclude patterns are precompiled after config load for faster matching.
@@ -154,7 +160,7 @@ if C.Port == 0 {
 }
 
 if C.Port < 1 || C.Port > 65535 {
-    return fmt.Errorf("Port must be between 1 and 65535, got %d", C.Port)
+    return fmt.Errorf("Config option port must be between 1 and 65535, got %d", C.Port)
 }
 ```
 
@@ -202,6 +208,3 @@ Version is injected at build time via ldflags:
 ```go
 var version = "dev"  // overridden by: -X main.version=$(VERSION)
 ```
-
-## Known Issues / TODO
-See TODO.org for current backlog.

@@ -38,25 +38,25 @@ func LoadConfig(path string) error {
 
 	// Address: default and no range validation needed.
 	if C.Address == "" {
-		C.Address = "0.0.0.0"
+		C.Address = defaultAddress
 
 		log.Warnf("Config option address is not set, fallback to %s", C.Address)
 	}
 
 	// Port: set default, then validate range.
 	if C.Port == 0 {
-		C.Port = 8086
+		C.Port = defaultPort
 
 		log.Warnf("Config option port is not set, fallback to %d", C.Port)
 	}
 
-	if C.Port < 1 || C.Port > 65535 {
-		return fmt.Errorf("Port must be between 1 and 65535, got %d", C.Port)
+	if C.Port < portMin || C.Port > portMax {
+		return fmt.Errorf("Config option port must be between %d and %d, got %d", portMin, portMax, C.Port)
 	}
 
 	// Location: default and no range validation needed.
 	if C.Location == "" {
-		C.Location = "/archive"
+		C.Location = defaultLocation
 
 		log.Warnf("Config option location is not set, fallback to %s", C.Location)
 	}
@@ -68,7 +68,7 @@ func LoadConfig(path string) error {
 
 	// LogLevel: default and no range validation needed.
 	if C.LogLevel == "" {
-		C.LogLevel = "info"
+		C.LogLevel = defaultLogLevel
 
 		log.Warnf("Config option loglevel is not set, fallback to %s", C.LogLevel)
 	}
@@ -86,24 +86,24 @@ func LoadConfig(path string) error {
 
 	// BackupTimeout: set default, then validate range.
 	if C.BackupTimeout == 0 {
-		C.BackupTimeout = 60
+		C.BackupTimeout = defaultBackupTimeout
 
 		log.Warnf("Config option backup_timeout is not set, fallback to %d minutes", C.BackupTimeout)
 	}
 
-	if C.BackupTimeout < 1 || C.BackupTimeout > 1440 {
-		return fmt.Errorf("Backup_timeout must be between 1 and 1440 minutes, got %d", C.BackupTimeout)
+	if C.BackupTimeout < backupTimeoutMin || C.BackupTimeout > backupTimeoutMax {
+		return fmt.Errorf("Config option backup_timeout must be between %d and %d minutes, got %d", backupTimeoutMin, backupTimeoutMax, C.BackupTimeout)
 	}
 
 	// CompressionLevel: set default, then validate range.
 	if C.CompressionLevel == 0 {
-		C.CompressionLevel = 9
+		C.CompressionLevel = defaultCompressionLevel
 
 		log.Warnf("Config option compression_level is not set, fallback to %d", C.CompressionLevel)
 	}
 
-	if C.CompressionLevel < 1 || C.CompressionLevel > 9 {
-		return fmt.Errorf("Compression_level must be between 1 and 9, got %d", C.CompressionLevel)
+	if C.CompressionLevel < compressionLevelMin || C.CompressionLevel > compressionLevelMax {
+		return fmt.Errorf("Config option compression_level must be between %d and %d, got %d", compressionLevelMin, compressionLevelMax, C.CompressionLevel)
 	}
 
 	// HTTPS: validate cert/key when HTTPS enabled.
@@ -120,30 +120,30 @@ func LoadConfig(path string) error {
 
 	// User: required.
 	if C.User == "" {
-		return errors.New("Option user is not set")
+		return errors.New("Config option user is not set")
 	}
 
 	// Password: required.
 	if C.Password == "" {
-		return errors.New("Option password is not set")
+		return errors.New("Config option password is not set")
 	}
 
 	// FilenamePrefix: default.
 	if C.FilenamePrefix == "" {
-		C.FilenamePrefix = "backup"
+		C.FilenamePrefix = defaultFilenamePrefix
 
 		log.Warnf("Config option filename_prefix is not set, fallback to %s", C.FilenamePrefix)
 	}
 
 	// CompressionAlgorithm: default and validate.
 	if C.CompressionAlgorithm == "" {
-		C.CompressionAlgorithm = "gzip"
+		C.CompressionAlgorithm = defaultCompressionAlgorithm
 
 		log.Warnf("Config option compression_algorithm is not set, fallback to %s", C.CompressionAlgorithm)
 	}
 
 	if C.CompressionAlgorithm != "gzip" && C.CompressionAlgorithm != "bzip2" && C.CompressionAlgorithm != "zstd" && C.CompressionAlgorithm != "lz4" && C.CompressionAlgorithm != "xz" && C.CompressionAlgorithm != "pgzip" {
-		return fmt.Errorf("Compression_algorithm must be gzip, bzip2, zstd, lz4, xz or pgzip, got %s", C.CompressionAlgorithm)
+		return fmt.Errorf("Config option compression_algorithm must be gzip, bzip2, zstd, lz4, xz or pgzip, got %s", C.CompressionAlgorithm)
 	}
 
 	// Compile exclude patterns.

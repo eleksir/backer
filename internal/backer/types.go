@@ -17,6 +17,7 @@ type (
 		BackupTimeout    int      `json:"backup_timeout"`    // Timeout in minutes for backup streaming.
 		CompressionLevel int      `json:"compression_level"` // Gzip compression level (1-9, default 9).
 		ExcludePatterns  []string `json:"exclude_patterns"`  // Regex patterns to exclude from backup.
+		FilenamePrefix   string   `json:"filename_prefix"`   // Prefix for backup filename (default: "backup").
 	}
 )
 

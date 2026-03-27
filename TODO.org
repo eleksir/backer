@@ -9,6 +9,6 @@
    - [ ] lz4 for speed, xz for better compression
    - [ ] Add compression_algorithm config option
 
-** TODO Configurable filename prefix
-   - [ ] Move "backup" prefix to config (currently hardcoded in newServer.go)
-   - [ ] Default: "backup", e.g., "backup-20260325-092341.tar.gz"
+** DONE Configurable filename prefix
+   - [X] Move "backup" prefix to config (currently hardcoded in newServer.go)
+   - [X] Default: "backup", e.g., "backup-20260325-092341.tar.gz"

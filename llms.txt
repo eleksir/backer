@@ -61,6 +61,7 @@ curl -u user:pass https://server:8086/archive -o backup.tar.gz
 | backup_timeout | 60 | Stream timeout in minutes (1-1440) |
 | compression_level | 9 | Gzip level (1-9) |
 | exclude_patterns | [] | Regex patterns to exclude from backup |
+| filename_prefix | backup | Prefix for backup filename in Content-Disposition header |
 
 ## Key Patterns
 

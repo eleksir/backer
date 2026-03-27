@@ -82,7 +82,7 @@ func NewServer(configPath string) (*http.Server, error) {
 		}()
 
 		timestamp := time.Now().Format("20060102-150405")
-		filename := fmt.Sprintf("backup-%s.tar.gz", timestamp)
+		filename := fmt.Sprintf("%s-%s.tar.gz", C.FilenamePrefix, timestamp)
 
 		w.Header().Set("Content-Disposition", "attachment; filename="+filename)
 		w.Header().Set("Content-Type", "application/octet-stream")

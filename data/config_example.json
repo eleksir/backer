@@ -33,5 +33,17 @@
     "directories": [
         "/path/to/directory1",
         "/path/to/directory2"
-    ]
+    ],
+
+    /* Backup streaming timeout in minutes.                                                                           */
+    "backup_timeout": 60,
+
+    /* Gzip compression level (1-9, where 9 is best compression).                                                    */
+    "compression_level": 9,
+
+    /* Regex patterns to exclude from backup.                                                                         */
+    "exclude_patterns": [],
+
+    /* Prefix for backup filename in Content-Disposition header.                                                      */
+    "filename_prefix": "backup"
 }

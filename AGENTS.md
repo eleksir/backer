@@ -181,6 +181,7 @@ Config is JSON (HJSON with comments supported). Default path depends on OS:
 | backup_timeout | `60` | Stream timeout in minutes (1-1440) |
 | compression_level | `9` | Gzip level (1-9) |
 | exclude_patterns | `[]` | Regex patterns to exclude from backup |
+| filename_prefix | `backup` | Prefix for backup filename in Content-Disposition header |
 
 ## Architecture & Key Patterns
 
@@ -278,4 +279,3 @@ Init scripts provided in `contrib/`:
 
 See `TODO.org` for current backlog:
 - Consider alternative compression algorithms (bz2, xz, lzo, lz4)
-- Configurable filename prefix for `Content-Disposition` header

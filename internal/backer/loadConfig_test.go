@@ -170,6 +170,27 @@ func TestLoadConfigNoHTTPS(t *testing.T) {
 	}
 }
 
+// TestLoadConfigFilenamePrefixCustom tests custom filename prefix.
+func TestLoadConfigFilenamePrefixCustom(t *testing.T) {
+	config := `{
+		"user": "test",
+		"password": "test",
+		"directories": ["../../test_data/test1/foo"],
+		"nohttps": true,
+		"filename_prefix": "mybackup"
+	}`
+	tmpFile := writeTempConfig(t, config)
+
+	err := LoadConfig(tmpFile)
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+
+	if C.FilenamePrefix != "mybackup" {
+		t.Errorf("C.FilenamePrefix should be mybackup, got %s", C.FilenamePrefix)
+	}
+}
+
 // TestLoadConfigDefaultValues tests default values are set correctly.
 func TestLoadConfigDefaultValues(t *testing.T) {
 	config := `{
@@ -200,6 +221,10 @@ func TestLoadConfigDefaultValues(t *testing.T) {
 
 	if C.LogLevel != "info" {
 		t.Errorf("C.LogLevel should default to info, got %s", C.LogLevel)
+	}
+
+	if C.FilenamePrefix != "backup" {
+		t.Errorf("C.FilenamePrefix should default to backup, got %s", C.FilenamePrefix)
 	}
 }
 

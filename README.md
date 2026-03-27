@@ -56,6 +56,7 @@ AI suggests to fill this section with useful information, despite that all optio
 | backup_timeout | 60 | Timeout in minutes for backup streaming operations. | If a backup takes longer than this, the connection will be terminated. Useful for large backups. Range: 1-1440 minutes (1 day max). |
 | compression_level | 9 | Gzip compression level for tar.gz archives. | 1 (fastest) to 9 (best compression). Higher values produce smaller files but take longer to compress. |
 | exclude_patterns | [] | Regex patterns to exclude from backup. | E.g., `[".*\\.tmp$", "/node_modules/"]`. Files matching any pattern are skipped. |
+| filename_prefix | "backup" | Prefix for backup filename in Content-Disposition header. | E.g., "mybackup" produces `mybackup-20260325-092341.tar.gz`. |
 
 ## Best practices
 

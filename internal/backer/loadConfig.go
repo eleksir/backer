@@ -128,6 +128,13 @@ func LoadConfig(path string) error {
 		return errors.New("Option password is not set")
 	}
 
+	// FilenamePrefix: default.
+	if C.FilenamePrefix == "" {
+		C.FilenamePrefix = "backup"
+
+		log.Warnf("Config option filename_prefix is not set, fallback to %s", C.FilenamePrefix)
+	}
+
 	// Compile exclude patterns.
 	excludePatterns = make([]*regexp.Regexp, 0, len(C.ExcludePatterns))
 

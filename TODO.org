@@ -5,9 +5,10 @@
 * TODO Backer Tasks
 
 ** TODO Consider different compression algorithms
-   - [ ] Evaluate alternatives to gzip: bz2, xz, lzo, lz4
-   - [ ] lz4 for speed, xz for better compression
-   - [ ] Add compression_algorithm config option
+   - [X] Evaluate alternatives to gzip: bz2, xz, lzo, lz4
+   - CANCELLED lzo. It has cgo implementaion which depends in liblzo, and native lid that does not support streaming. 
+   - [X] Implemented bzip2 as alternative (pure Go, via github.com/dsnet/compress)
+   - [X] Add compression_algorithm config option
 
 ** DONE Configurable filename prefix
    - [X] Move "backup" prefix to config (currently hardcoded in newServer.go)

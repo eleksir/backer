@@ -73,21 +73,32 @@ func NewServer(configPath string) (*http.Server, error) {
 			return
 		}
 
-		tarGz := CreateTarGzStream(ctx, files)
+		var (
+			archive   io.ReadCloser
+			extension string
+		)
+
+		if C.CompressionAlgorithm == "bzip2" {
+			archive = CreateTarBzip2Stream(ctx, files)
+			extension = "tar.bz2"
+		} else {
+			archive = CreateTarGzStream(ctx, files)
+			extension = "tar.gz"
+		}
 
 		defer func() {
-			if err := tarGz.Close(); err != nil {
-				log.Errorf("Failed to close tar.gz reader: %v", err)
+			if err := archive.Close(); err != nil {
+				log.Errorf("Failed to close archive reader: %v", err)
 			}
 		}()
 
 		timestamp := time.Now().Format("20060102-150405")
-		filename := fmt.Sprintf("%s-%s.tar.gz", C.FilenamePrefix, timestamp)
+		filename := fmt.Sprintf("%s-%s.%s", C.FilenamePrefix, timestamp, extension)
 
 		w.Header().Set("Content-Disposition", "attachment; filename="+filename)
 		w.Header().Set("Content-Type", "application/octet-stream")
 
-		bytesWritten, err := io.Copy(w, tarGz)
+		bytesWritten, err := io.Copy(w, archive)
 		duration := time.Since(backupStart)
 
 		if err != nil {

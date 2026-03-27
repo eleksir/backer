@@ -226,6 +226,48 @@ func TestLoadConfigDefaultValues(t *testing.T) {
 	if C.FilenamePrefix != "backup" {
 		t.Errorf("C.FilenamePrefix should default to backup, got %s", C.FilenamePrefix)
 	}
+
+	if C.CompressionAlgorithm != "gzip" {
+		t.Errorf("C.CompressionAlgorithm should default to gzip, got %s", C.CompressionAlgorithm)
+	}
+}
+
+// TestLoadConfigCompressionAlgorithmBzip2 tests bzip2 compression algorithm.
+func TestLoadConfigCompressionAlgorithmBzip2(t *testing.T) {
+	config := `{
+		"user": "test",
+		"password": "test",
+		"directories": ["../../test_data/test1/foo"],
+		"nohttps": true,
+		"compression_algorithm": "bzip2"
+	}`
+	tmpFile := writeTempConfig(t, config)
+
+	err := LoadConfig(tmpFile)
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+
+	if C.CompressionAlgorithm != "bzip2" {
+		t.Errorf("C.CompressionAlgorithm should be bzip2, got %s", C.CompressionAlgorithm)
+	}
+}
+
+// TestLoadConfigCompressionAlgorithmInvalid tests invalid compression algorithm.
+func TestLoadConfigCompressionAlgorithmInvalid(t *testing.T) {
+	config := `{
+		"user": "test",
+		"password": "test",
+		"directories": ["../../test_data/test1/foo"],
+		"nohttps": true,
+		"compression_algorithm": "invalid"
+	}`
+	tmpFile := writeTempConfig(t, config)
+
+	err := LoadConfig(tmpFile)
+	if err == nil {
+		t.Error("Expected error for invalid compression algorithm, got nil")
+	}
 }
 
 // writeTempConfig is a helper to write a temp config file for testing.

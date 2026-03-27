@@ -135,6 +135,17 @@ func LoadConfig(path string) error {
 		log.Warnf("Config option filename_prefix is not set, fallback to %s", C.FilenamePrefix)
 	}
 
+	// CompressionAlgorithm: default and validate.
+	if C.CompressionAlgorithm == "" {
+		C.CompressionAlgorithm = "gzip"
+
+		log.Warnf("Config option compression_algorithm is not set, fallback to %s", C.CompressionAlgorithm)
+	}
+
+	if C.CompressionAlgorithm != "gzip" && C.CompressionAlgorithm != "bzip2" {
+		return fmt.Errorf("Compression_algorithm must be gzip or bzip2, got %s", C.CompressionAlgorithm)
+	}
+
 	// Compile exclude patterns.
 	excludePatterns = make([]*regexp.Regexp, 0, len(C.ExcludePatterns))
 

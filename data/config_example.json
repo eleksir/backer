@@ -45,5 +45,8 @@
     "exclude_patterns": [],
 
     /* Prefix for backup filename in Content-Disposition header.                                                      */
-    "filename_prefix": "backup"
+    "filename_prefix": "backup",
+
+    /* Compression algorithm: gzip or bzip2.                                                                         */
+    "compression_algorithm": "gzip"
 }

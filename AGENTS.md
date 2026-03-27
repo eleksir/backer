@@ -182,6 +182,7 @@ Config is JSON (HJSON with comments supported). Default path depends on OS:
 | compression_level | `9` | Gzip level (1-9) |
 | exclude_patterns | `[]` | Regex patterns to exclude from backup |
 | filename_prefix | `backup` | Prefix for backup filename in Content-Disposition header |
+| compression_algorithm | `gzip` | Compression algorithm: gzip or bzip2 |
 
 ## Architecture & Key Patterns
 
@@ -277,5 +278,4 @@ Init scripts provided in `contrib/`:
 
 ## TODO / Roadmap
 
-See `TODO.org` for current backlog:
-- Consider alternative compression algorithms (bz2, xz, lzo, lz4)
+See `TODO.org` for current backlog.

@@ -62,6 +62,7 @@ curl -u user:pass https://server:8086/archive -o backup.tar.gz
 | compression_level | 9 | Gzip level (1-9) |
 | exclude_patterns | [] | Regex patterns to exclude from backup |
 | filename_prefix | backup | Prefix for backup filename in Content-Disposition header |
+| compression_algorithm | gzip | Compression algorithm (gzip or bzip2) |
 
 ## Key Patterns
 
@@ -203,6 +204,4 @@ var version = "dev"  // overridden by: -X main.version=$(VERSION)
 ```
 
 ## Known Issues / TODO
-See TODO.org for current backlog:
-- Consider different compression algorithms (bz2, xz, lzo, lz4)
-- Consider configurable filename prefix for content-disposition
+See TODO.org for current backlog.

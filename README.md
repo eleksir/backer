@@ -1,6 +1,6 @@
 # Backer
 
-HTTP/HTTPS backup server that creates compressed archives on-the-fly from configured directories. Supports multiple compression algorithms: gzip, pgzip, bzip2, zstd, lz4, xz.
+HTTP/HTTPS backup server that creates compressed archives on-the-fly from configured directories. Supports multiple compression algorithms: gzip, pgzip (which is parallel gzip), bzip2, zstd, lz4, xz.
 
 ## How to build it
 
@@ -60,6 +60,8 @@ All options described in example config.
 
 ## Compression algorithms
 
+AI suggests this table as expected performance.
+
 | Algorithm | Speed | Compression | Notes |
 | :--- | :--- | :--- | :--- |
 | gzip | Fast | Good | Default. Standard, widely compatible. |
@@ -68,6 +70,23 @@ All options described in example config.
 | zstd | Fast | Very good | Good balance of speed and compression. |
 | lz4 | Fastest | Moderate | Extremely fast, larger files. |
 | xz | Slowest | Best | Best compression, slowest speed. |
+
+In real live with backup of 1 lxc container inside vm powered by 1 core cpu, 768Mb RAM and 100Mbit non-guaranteed
+network bandwidth, located in near by country I've got these results
+
+| Algorithm | Size       | Time    | CPU Load | RAM RSS+Shm, Mb | Notes |
+| :---      | ---:       | ---:    | ---:     | ---:            | :---  |
+| None      | 1461250551 |         |     0-2% |             0+0 | original dataset |
+| lz4       | 1097745915 |  6m:12s |     4-6% |            30+6 | multithreaded lz4, pierrec/lz4 |
+| zstd      |  614015773 |  4m:52s |   40-60% |            60+6 | klauspost/compress/zstd |
+| pgzip     |  817163857 | 11m:25s |   96-97% |            37+6 | multithreaded (parallel gzip), fully gzip compatible, klauspost/pgzip |
+| gzip      |  816734188 | 14m:30s |      96% |            18+6 | stdlib compression/gzip |
+| bzip2     |  788061284 |  7m:16s |   92-94% |            43+6 | dsnet/compress/bzip2 |
+| xz        |  512004612 | 13m:53s |      96% |           116+6 | ulikunitz/xz |
+
+Obvously in case of lz4 and zstd the bottleneck was network. And I have to admit, that network definitely was not
+100Mbit, but it was pretty hard to measure real bandwidth. Anyway let's pretend that during experiment it was roughly
+the same.
 
 ## Best practices
 

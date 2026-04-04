@@ -227,6 +227,12 @@ func copyWithContext(ctx context.Context, dst io.Writer, src io.Reader) error {
 
 		n, readErr := src.Read(buf)
 		if n > 0 {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+			}
+
 			if _, werr := dst.Write(buf[:n]); werr != nil {
 				return werr
 			}

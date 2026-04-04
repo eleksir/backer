@@ -178,31 +178,39 @@ func NewServer(configPath string) (*ServerWrapper, error) {
 	// HTTP mode if nohttps is enabled in config.
 	// HTTPS mode if nohttps is disabled in config.
 	if C.NoHTTPS {
-		return &ServerWrapper{
+		srv := &ServerWrapper{
 			Server: &http.Server{
 				Addr:              fmt.Sprintf("%s:%d", C.Address, C.Port),
 				Handler:           withServerHeader(mux),
 				ReadHeaderTimeout: readHeaderTimeout,
 				WriteTimeout:      time.Duration(C.BackupTimeout) * time.Minute,
+				IdleTimeout:       idleTimeout,
 				MaxHeaderBytes:    maxHeaderBytes,
 				ErrorLog:          log.DebugLogger(),
 			},
-		}, nil
+		}
+		srv.SetKeepAlivesEnabled(false)
+
+		return srv, nil
 	}
 
-	return &ServerWrapper{
+	srv := &ServerWrapper{
 		Server: &http.Server{
 			Addr:              fmt.Sprintf("%s:%d", C.Address, C.Port),
 			Handler:           withServerHeader(mux),
 			ReadHeaderTimeout: readHeaderTimeout,
 			WriteTimeout:      time.Duration(C.BackupTimeout) * time.Minute,
+			IdleTimeout:       idleTimeout,
 			MaxHeaderBytes:    maxHeaderBytes,
 			TLSConfig: &tls.Config{
 				MinVersion: tls.VersionTLS13,
 			},
 			ErrorLog: log.DebugLogger(),
 		},
-	}, nil
+	}
+	srv.SetKeepAlivesEnabled(false)
+
+	return srv, nil
 }
 
 // writeWithContext checks if context is canceled before executing fn.

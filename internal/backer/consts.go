@@ -14,6 +14,9 @@ const (
 	// maxHeaderBytes is the maximum size of request headers (1KB).
 	maxHeaderBytes = 1024
 
+	// idleTimeout is the maximum time to wait for the next request on keep-alive connections.
+	idleTimeout = 10 * time.Second
+
 	// portMin is the minimum valid port number.
 	portMin = 1
 

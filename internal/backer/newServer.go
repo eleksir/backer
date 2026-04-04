@@ -2,8 +2,10 @@ package backer
 
 import (
 	"context"
+	"crypto/md5"
 	"crypto/subtle"
 	"crypto/tls"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -71,7 +73,7 @@ func NewServer(configPath string) (*ServerWrapper, error) {
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc(C.Location, func(w http.ResponseWriter, r *http.Request) {
+	backupHandler := func(w http.ResponseWriter, r *http.Request) {
 		username, password, ok := r.BasicAuth()
 
 		// No auth? Good bye.
@@ -105,7 +107,6 @@ func NewServer(configPath string) (*ServerWrapper, error) {
 		if err != nil {
 			log.Errorf("Failed to get files: %v", err)
 
-			w.Header().Set("Server", "backer")
 			http.Error(w, "Failed to get files", http.StatusInternalServerError)
 
 			return
@@ -121,7 +122,7 @@ func NewServer(configPath string) (*ServerWrapper, error) {
 			algorithm string
 		)
 
-		requestedExt := strings.TrimPrefix(path.Ext(r.URL.Path), ".")
+		requestedExt := r.URL.Path
 
 		algorithm = getCompressionAlgorithm(requestedExt)
 
@@ -132,7 +133,11 @@ func NewServer(configPath string) (*ServerWrapper, error) {
 
 		case "zstd":
 			archive = CreateTarZstdStream(ctx, files)
-			extension = "tar.zst"
+			if strings.HasSuffix(requestedExt, ".zst") {
+				extension = "tar.zst"
+			} else {
+				extension = "tar.zstd"
+			}
 
 		case "lz4":
 			archive = CreateTarLz4Stream(ctx, files)
@@ -157,23 +162,43 @@ func NewServer(configPath string) (*ServerWrapper, error) {
 			}
 		}()
 
-		timestamp := time.Now().Format("20060102-150405")
+		timestamp := backupStart.Format("20060102-150405")
 		filename := fmt.Sprintf("%s-%s.%s", C.FilenamePrefix, timestamp, extension)
 
 		w.Header().Set("Content-Disposition", "attachment; filename="+filename)
 		w.Header().Set("Content-Type", "application/octet-stream")
 
-		bytesWritten, err := io.Copy(w, archive)
-		duration := time.Since(backupStart)
-
+		bytesWritten, md5Hash, err := copyWithContext(ctx, w, archive)
 		if err != nil {
+			duration := time.Since(backupStart)
+
+			if errors.Is(err, context.Canceled) {
+				log.Infof("Backup canceled: client=%s user=%s duration=%s", clientIP, username, duration)
+
+				return
+			}
+
+			if isPipeClosedError(err) {
+				log.Infof("Client disconnected during backup: client=%s user=%s", clientIP, username)
+
+				return
+			}
+
 			log.Errorf("Backup failed: client=%s user=%s duration=%s error=%v", clientIP, username, duration, err)
 
 			return
 		}
 
-		log.Infof("Backup completed: client=%s user=%s files=%d bytes=%d duration=%s", clientIP, username, len(files), bytesWritten, duration)
-	})
+		log.Infof("Backup completed: client=%s user=%s files=%d bytes=%d md5=%s duration=%s", clientIP, username, len(files), bytesWritten, md5Hash, time.Since(backupStart))
+	}
+
+	mux.Handle(C.Location, http.HandlerFunc(backupHandler))
+
+	extensions := []string{".tar.gz", ".tar.xz", ".tar.bz2", ".tar.lz4", ".tar.zst", ".tar.zstd"}
+	for _, ext := range extensions {
+		muxPath := C.Location + ext
+		mux.Handle(muxPath, http.HandlerFunc(backupHandler))
+	}
 
 	// HTTP mode if nohttps is enabled in config.
 	// HTTPS mode if nohttps is disabled in config.
@@ -226,15 +251,20 @@ func writeWithContext(ctx context.Context, fn func() error) error {
 }
 
 // copyWithContext copies data from src to dst using a 32KB buffer, respecting
-// context cancellation. If the context is canceled, the copy stops and returns
-// ctx.Err().
-func copyWithContext(ctx context.Context, dst io.Writer, src io.Reader) error {
+// context cancellation. Returns bytes written, MD5 hash (hex string), and any error encountered.
+//
+//nolint:gosec
+func copyWithContext(ctx context.Context, dst io.Writer, src io.Reader) (int64, string, error) {
 	buf := make([]byte, copyBufferSize)
+
+	var bytesWritten int64
+
+	hasher := md5.New()
 
 	for {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return bytesWritten, "", ctx.Err()
 		default:
 		}
 
@@ -242,21 +272,29 @@ func copyWithContext(ctx context.Context, dst io.Writer, src io.Reader) error {
 		if n > 0 {
 			select {
 			case <-ctx.Done():
-				return ctx.Err()
+				return bytesWritten, "", ctx.Err()
 			default:
 			}
 
-			if _, werr := dst.Write(buf[:n]); werr != nil {
-				return werr
+			if _, werr := hasher.Write(buf[:n]); werr != nil {
+				return bytesWritten, "", werr
 			}
+
+			if _, werr := dst.Write(buf[:n]); werr != nil {
+				return bytesWritten, "", werr
+			}
+
+			bytesWritten += int64(n)
 		}
 
 		if readErr != nil {
 			if readErr == io.EOF {
-				return nil
+				hash := hex.EncodeToString(hasher.Sum(nil))
+
+				return bytesWritten, hash, nil
 			}
 
-			return readErr
+			return bytesWritten, "", readErr
 		}
 	}
 }
@@ -279,17 +317,39 @@ func getClientIP(r *http.Request) string {
 // getCompressionAlgorithm determines which compression algorithm to use based on the requested extension.
 // If the extension is recognized, it returns the corresponding algorithm; otherwise, it returns the default.
 // For .tar.gz extension, pgzip is always used for parallel compression.
-func getCompressionAlgorithm(requestedExt string) string {
-	switch requestedExt {
-	case "tar.bz2":
+// The input can be either a full path like "/archive.tar.xz" or just the extension like "tar.xz" or "xz".
+func getCompressionAlgorithm(input string) string {
+	// Extract extension from full path (e.g., "/archive.tar.xz" -> ".xz").
+	// or use the input directly if it's just an extension (e.g., "tar.xz" -> ".xz").
+	ext := path.Ext(input)
+	if ext == "" {
+		ext = "." + input
+	}
+
+	switch ext {
+	case ".tar.bz2":
 		return "bzip2"
-	case "tar.zst":
+	case ".tar.zstd":
 		return "zstd"
-	case "tar.lz4":
+	case ".tar.zst":
+		return "zstd"
+	case ".tar.lz4":
 		return "lz4"
-	case "tar.xz":
+	case ".tar.xz":
 		return "xz"
-	case "tar.gz":
+	case ".tar.gz":
+		return "pgzip"
+	case ".xz":
+		return "xz"
+	case ".bz2":
+		return "bzip2"
+	case ".zst":
+		return "zstd"
+	case ".zstd":
+		return "zstd"
+	case ".lz4":
+		return "lz4"
+	case ".gz":
 		return "pgzip"
 	default:
 		return C.DefaultCompression

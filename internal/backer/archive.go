@@ -173,7 +173,7 @@ func writeFilesToTar(ctx context.Context, filepaths []string, tw *tar.Writer, cl
 				continue
 			}
 
-			err = copyWithContext(ctx, tw, f)
+			_, _, err = copyWithContext(ctx, tw, f)
 
 			if e := f.Close(); e != nil {
 				log.Warnf("Failed to close file %s: %v", fpath, e)
@@ -188,7 +188,7 @@ func writeFilesToTar(ctx context.Context, filepaths []string, tw *tar.Writer, cl
 	}
 }
 
-// getInode extracts the inode number from os.FileInfo.
+// getInode extracts the inode number from [os.FileInfo].
 // Returns 0 if unable to determine (e.g., on Windows or with certain file systems).
 func getInode(fi os.FileInfo) uint64 {
 	if fi.Sys() == nil {

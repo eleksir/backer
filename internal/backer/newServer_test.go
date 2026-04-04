@@ -463,13 +463,32 @@ func TestCopyWithContextSuccess(t *testing.T) {
 	src := strings.NewReader("hello world")
 	dst := &strings.Builder{}
 
-	err := copyWithContext(ctx, dst, src)
+	_, _, err := copyWithContext(ctx, dst, src)
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
 	}
 
 	if dst.String() != "hello world" {
 		t.Errorf("Expected 'hello world', got '%s'", dst.String())
+	}
+}
+
+// TestCopyWithContextMD5Hash tests that MD5 hash is correctly computed.
+func TestCopyWithContextMD5Hash(t *testing.T) {
+	ctx := context.Background()
+	data := "hello world"
+	src := strings.NewReader(data)
+	dst := &strings.Builder{}
+
+	_, md5Hash, err := copyWithContext(ctx, dst, src)
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+
+	// MD5 of "hello world" is 5eb63bbbe01eeed093cb22bb8f5acdc3
+	expectedMD5 := "5eb63bbbe01eeed093cb22bb8f5acdc3"
+	if md5Hash != expectedMD5 {
+		t.Errorf("Expected MD5 %s, got %s", expectedMD5, md5Hash)
 	}
 }
 
@@ -487,14 +506,18 @@ func TestCopyWithContextCancellation(t *testing.T) {
 
 	// Start copy in goroutine
 	errCh := make(chan error, 1)
+	bytesCh := make(chan int64, 1)
 	go func() {
-		errCh <- copyWithContext(ctx, dst, src)
+		n, _, err := copyWithContext(ctx, dst, src)
+		bytesCh <- n
+		errCh <- err
 	}()
 
 	// Cancel context immediately
 	cancel()
 
 	err := <-errCh
+	<-bytesCh
 	if err != context.Canceled {
 		t.Errorf("Expected context.Canceled, got %v", err)
 	}

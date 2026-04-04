@@ -227,8 +227,8 @@ func TestLoadConfigDefaultValues(t *testing.T) {
 		t.Errorf("C.FilenamePrefix should default to backup, got %s", C.FilenamePrefix)
 	}
 
-	if C.CompressionAlgorithm != "gzip" {
-		t.Errorf("C.CompressionAlgorithm should default to gzip, got %s", C.CompressionAlgorithm)
+	if C.DefaultCompression != "gzip" {
+		t.Errorf("C.DefaultCompression should default to gzip, got %s", C.DefaultCompression)
 	}
 }
 
@@ -248,8 +248,8 @@ func TestLoadConfigCompressionAlgorithmBzip2(t *testing.T) {
 		t.Errorf("Expected no error, got %v", err)
 	}
 
-	if C.CompressionAlgorithm != "bzip2" {
-		t.Errorf("C.CompressionAlgorithm should be bzip2, got %s", C.CompressionAlgorithm)
+	if C.DefaultCompression != "bzip2" {
+		t.Errorf("C.DefaultCompression should be bzip2, got %s", C.DefaultCompression)
 	}
 }
 
@@ -269,8 +269,8 @@ func TestLoadConfigCompressionAlgorithmZstd(t *testing.T) {
 		t.Errorf("Expected no error, got %v", err)
 	}
 
-	if C.CompressionAlgorithm != "zstd" {
-		t.Errorf("C.CompressionAlgorithm should be zstd, got %s", C.CompressionAlgorithm)
+	if C.DefaultCompression != "zstd" {
+		t.Errorf("C.DefaultCompression should be zstd, got %s", C.DefaultCompression)
 	}
 }
 
@@ -290,8 +290,8 @@ func TestLoadConfigCompressionAlgorithmLz4(t *testing.T) {
 		t.Errorf("Expected no error, got %v", err)
 	}
 
-	if C.CompressionAlgorithm != "lz4" {
-		t.Errorf("C.CompressionAlgorithm should be lz4, got %s", C.CompressionAlgorithm)
+	if C.DefaultCompression != "lz4" {
+		t.Errorf("C.DefaultCompression should be lz4, got %s", C.DefaultCompression)
 	}
 }
 
@@ -311,8 +311,8 @@ func TestLoadConfigCompressionAlgorithmXz(t *testing.T) {
 		t.Errorf("Expected no error, got %v", err)
 	}
 
-	if C.CompressionAlgorithm != "xz" {
-		t.Errorf("C.CompressionAlgorithm should be xz, got %s", C.CompressionAlgorithm)
+	if C.DefaultCompression != "xz" {
+		t.Errorf("C.DefaultCompression should be xz, got %s", C.DefaultCompression)
 	}
 }
 
@@ -332,8 +332,8 @@ func TestLoadConfigCompressionAlgorithmPgzip(t *testing.T) {
 		t.Errorf("Expected no error, got %v", err)
 	}
 
-	if C.CompressionAlgorithm != "pgzip" {
-		t.Errorf("C.CompressionAlgorithm should be pgzip, got %s", C.CompressionAlgorithm)
+	if C.DefaultCompression != "pgzip" {
+		t.Errorf("C.DefaultCompression should be pgzip, got %s", C.DefaultCompression)
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"path"
 	"strings"
 	"time"
 
@@ -76,9 +77,14 @@ func NewServer(configPath string) (*http.Server, error) {
 		var (
 			archive   io.ReadCloser
 			extension string
+			algorithm string
 		)
 
-		switch C.CompressionAlgorithm {
+		requestedExt := strings.TrimPrefix(path.Ext(r.URL.Path), ".")
+
+		algorithm = getCompressionAlgorithm(requestedExt)
+
+		switch algorithm {
 		case "bzip2":
 			archive = CreateTarBzip2Stream(ctx, files)
 			extension = "tar.bz2"
@@ -205,6 +211,26 @@ func getClientIP(r *http.Request) string {
 	}
 
 	return host
+}
+
+// getCompressionAlgorithm determines which compression algorithm to use based on the requested extension.
+// If the extension is recognized, it returns the corresponding algorithm; otherwise, it returns the default.
+// For .tar.gz extension, pgzip is always used for parallel compression.
+func getCompressionAlgorithm(requestedExt string) string {
+	switch requestedExt {
+	case "tar.bz2":
+		return "bzip2"
+	case "tar.zst":
+		return "zstd"
+	case "tar.lz4":
+		return "lz4"
+	case "tar.xz":
+		return "xz"
+	case "tar.gz":
+		return "pgzip"
+	default:
+		return C.DefaultCompression
+	}
 }
 
 /* vim: setlocal ft=go noet ai ts=4 sw=4 sts=4: */

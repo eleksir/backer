@@ -50,8 +50,8 @@ const (
 	// defaultFilenamePrefix is the default prefix for backup filenames.
 	defaultFilenamePrefix = "backup"
 
-	// defaultCompressionAlgorithm is the default compression algorithm.
-	defaultCompressionAlgorithm = "gzip"
+	// defaultDefaultCompression is the default compression algorithm.
+	defaultDefaultCompression = "gzip"
 )
 
 /* vim: setlocal ft=go noet ai ts=4 sw=4 sts=4: */

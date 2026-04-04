@@ -28,10 +28,22 @@ If you running FreeBSD, use the rc.d script `contrib/backer.freebsd` and place i
 Build, install and configure backer. On your backup storage server you can do
 
 ```bash
-curl -u username:password https://your_server:8086/archive -o "backup-$(date +%Y%m%d-%H%M%S).tar.gz"
+wget --quiet --no-check-certificate --content-disposition --http-user=username --http-password=password https://your_server:8086/archive
 ```
 
-The filename and extension depend on your `filename_prefix` and `compression_algorithm` settings.
+The filename and extension depend on your `filename_prefix` and `default_compression` settings.
+
+You can also override compression by specifying the archive extension in the URL:
+
+```bash
+wget --quiet --no-check-certificate --content-disposition --http-user=username --http-password=password https://your_server:8086/archive.xz
+wget --quiet --no-check-certificate --content-disposition --http-user=username --http-password=password https://your_server:8086/archive.gz    # Uses pgzip
+wget --quiet --no-check-certificate --content-disposition --http-user=username --http-password=password https://your_server:8086/archive.bz2
+wget --quiet --no-check-certificate --content-disposition --http-user=username --http-password=password https://your_server:8086/archive.zst
+wget --quiet --no-check-certificate --content-disposition --http-user=username --http-password=password https://your_server:8086/archive.lz4
+```
+
+Note: `/archive.tar.gz` always uses pgzip (parallel gzip) for better performance.
 
 Of course, something can go wrong, so you must check http status code after downloading backup.
 
@@ -56,7 +68,8 @@ All options described in example config.
 | compression_level | 9 | Compression level. | 1 (fastest) to 9 (best compression). |
 | exclude_patterns | [] | Regex patterns to exclude from backup. | E.g., `[".*\\.tmp$", "/node_modules/"]`. |
 | filename_prefix | "backup" | Prefix for backup filename. | E.g., "mybackup" produces `mybackup-20260325-092341.tar.gz`. |
-| compression_algorithm | "gzip" | Compression algorithm. | Options: gzip, pgzip, bzip2, zstd, lz4, xz. |
+| default_compression | "gzip" | Default compression algorithm. | Options: gzip, pgzip, bzip2, zstd, lz4, xz. |
+| compression_algorithm | "gzip" | Alias for default_compression. | You should use default_compression instead. |
 
 ## Compression algorithms
 

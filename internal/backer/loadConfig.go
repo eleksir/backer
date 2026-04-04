@@ -135,15 +135,20 @@ func LoadConfig(path string) error {
 		log.Warnf("Config option filename_prefix is not set, fallback to %s", C.FilenamePrefix)
 	}
 
-	// CompressionAlgorithm: default and validate.
-	if C.CompressionAlgorithm == "" {
-		C.CompressionAlgorithm = defaultCompressionAlgorithm
-
-		log.Warnf("Config option compression_algorithm is not set, fallback to %s", C.CompressionAlgorithm)
+	// DefaultCompression: default and validate. If compression_algorithm is set (deprecated), use it as fallback.
+	if C.DefaultCompression == "" {
+		if C.CompressionAlgorithm != "" {
+			C.DefaultCompression = C.CompressionAlgorithm
+		} else {
+			C.DefaultCompression = defaultDefaultCompression
+		}
 	}
 
-	if C.CompressionAlgorithm != "gzip" && C.CompressionAlgorithm != "bzip2" && C.CompressionAlgorithm != "zstd" && C.CompressionAlgorithm != "lz4" && C.CompressionAlgorithm != "xz" && C.CompressionAlgorithm != "pgzip" {
-		return fmt.Errorf("Config option compression_algorithm must be gzip, bzip2, zstd, lz4, xz or pgzip, got %s", C.CompressionAlgorithm)
+	switch C.DefaultCompression {
+	case "gzip", "pgzip", "bzip2", "xz", "lz4", "zstd":
+		log.Infof("Using %s as defailt compression algorithm", C.DefaultCompression)
+	default:
+		return fmt.Errorf("Config option default_compression must be gzip, bzip2, zstd, lz4, xz or pgzip, got %s", C.DefaultCompression)
 	}
 
 	// Compile exclude patterns.

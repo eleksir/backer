@@ -4,17 +4,28 @@
 
 Backer is a Go-based HTTP/HTTPS backup server that creates compressed archives on-the-fly from configured directories. Supports multiple compression algorithms: gzip, pgzip, bzip2, zstd, lz4, xz. It serves a single endpoint that clients (e.g., `curl`) can query to download a timestamped backup archive. Licensed under MIT.
 
+## Fundamental Rules
+
+- **Do not apply changes without explicit user consent.** When asked to analyze, review, or suggest any changes, present your proposal first and wait for confirmation before editing any files. Always ask "Should I implement this?" or "Should I apply these changes?" before modifying anything.
+- **Keep codebase simple, small, maintainable, safe and human-readable.** Favour minimal, clear solutions over clever or abstract ones. Prefer clarity over cleverness. Prioritize explicitness. Minimize magic. Do not introduce patterns, layers, or indirection unless they directly solve a concrete problem. Every line of code must earn its place.
+- **Create small focused modules and separate functionality over files.** Do not make universal implementation; try to move functions to separate files and name files after function names.
+- **Use a consistent structure.** Subsequent searches will be faster and consume less context.
+- **Avoid duplicate names.** This is not strict rule. If codebase contain multiple files with the same name (e.g., index.ts), we have to read them all to discover the one exactly we need. This consumes time and context.
+- **When stuck, ask clarification questions, or present a short plan, or both.** Do not try to guess intent or make assumptions - ask.
+- **Always make TODO plan before any job and follow it closely.**
+- **Report any found defects, issues, bugs.** And keep track of them.
+- **Comment the code.** Add code comments to explain corner cases, complex logic, business rules, and design decisions. Focus on **what** problem the code is solving rather than **how** it is solving it. Write comments in easy to read and understand language, for humans to comprehend. Every public API and structure field must have a docstring.
+- **Use domain names.** Use naming conventions that reflect their purpose and domain concepts, not their technical implementation (e.g., OrderProcessor instead of OrderServiceFactory).
+- **Test corner cases.** Write comprehensive test suites that cover various scenarios and edge cases.
+- **Use tags and labels.** In comments, add tags or labels to files, classes, or functions to categorize them based on functionality, domain concepts, or design patterns.
+- **Avoid obvious comments that do not add value.**
+- **Remove dead code.** A half-finished refactoring can actually harm the contributions.
+- **Update AGENTS.md and TODO.md automatically.** Keep AGENTS.md dense, detailed and concise.
+
 ## Workflow Rules
 
-- **Do not apply changes without explicit user consent.** When asked to analyze, review, or suggest improvements, present your proposal first and wait for confirmation before editing any files. Always ask "Should I implement this?" or "Should I apply these changes?" before writing code.
-- **Keep the codebase simple, small, maintainable, safe, and human-readable.** Favor minimal, clear solutions over clever or abstract ones. Do not introduce patterns, layers, or indirection unless they directly solve a concrete problem. Every line of code must earn its place.
-- **When stuck, ask a clarification question, or propose a short plan, or both.** Do not guess intent or make assumptions — ask.
-- **Always make a TODO plan before acting. And try to follow this plan.**
-- **If you notice defects, bugs, or issues, always report it.**
-- **Track new features, known issues, bugs, and other defects.** Update documentation as you implement features, fix issues, fix bugs, or discover new ones.
-- **Update `AGENTS.md` as the project evolves.** Keep it comprehensive but dense.
 - **Don't use `context` package unless absolutely necessary.** Try to find another solution first.
-- **Create unit tests if possible/necessary** to verify changes that are not covered by unit tests.
+- **Create functional and unit tests if possible/necessary** to verify changes that software code works at is should.
 
 ## Build & Test Commands
 

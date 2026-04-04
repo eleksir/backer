@@ -354,4 +354,35 @@ func TestCloseStderr(t *testing.T) {
 	}
 }
 
+// TestDebugLogger tests that DebugLogger returns a working *log.Logger.
+func TestDebugLogger(t *testing.T) {
+	tmpFile, err := os.CreateTemp(t.TempDir(), "test_log_*.log")
+	if err != nil {
+		t.Fatal(err)
+	}
+	logFilePath := tmpFile.Name()
+	tmpFile.Close()
+
+	if err := Init("info", logFilePath); err != nil {
+		t.Fatal(err)
+	}
+	defer Close()
+
+	logger := DebugLogger()
+	if logger == nil {
+		t.Error("DebugLogger returned nil")
+	}
+
+	logger.Print("test debug message")
+
+	content, err := os.ReadFile(logFilePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(string(content), "test debug message") {
+		t.Error("Expected debug message in log")
+	}
+}
+
 /* vim: setlocal ft=go noet ai ts=4 sw=4 sts=4: */

@@ -27,3 +27,5 @@ Thumbs.db
 *.exe
 *.test
 *.out
+
+/test_data/tmp

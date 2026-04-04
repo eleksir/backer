@@ -4,12 +4,174 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"context"
+	"crypto/tls"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 )
+
+// TestIsTLSError tests the isTLSError function.
+func TestIsTLSError(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{
+			name:     "nil error",
+			err:      nil,
+			expected: false,
+		},
+		{
+			name:     "regular error",
+			err:      errors.New("some random error"),
+			expected: false,
+		},
+		{
+			name:     "TLS prefix error",
+			err:      errors.New("tls: handshake failure"),
+			expected: true,
+		},
+		{
+			name:     "TLS AlertError",
+			err:      tls.AlertError(80),
+			expected: true,
+		},
+		{
+			name:     "TLS CertificateVerificationError",
+			err:      &tls.CertificateVerificationError{},
+			expected: true,
+		},
+		{
+			name:     "TLS ECHRejectionError",
+			err:      &tls.ECHRejectionError{RetryConfigList: []byte("rejected")},
+			expected: true,
+		},
+		{
+			name:     "TLS RecordHeaderError",
+			err:      &tls.RecordHeaderError{},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isTLSError(tt.err)
+			if result != tt.expected {
+				t.Errorf("isTLSError(%v) = %v, expected %v", tt.err, result, tt.expected)
+			}
+		})
+	}
+}
+
+// TestGetClientIP tests the getClientIP function.
+func TestGetClientIP(t *testing.T) {
+	tests := []struct {
+		name       string
+		xffHeader  string
+		remoteAddr string
+		expectedIP string
+	}{
+		{
+			name:       "no X-Forwarded-For",
+			xffHeader:  "",
+			remoteAddr: "192.168.1.100:12345",
+			expectedIP: "192.168.1.100",
+		},
+		{
+			name:       "single IP in X-Forwarded-For",
+			xffHeader:  "10.0.0.1",
+			remoteAddr: "192.168.1.100:12345",
+			expectedIP: "10.0.0.1",
+		},
+		{
+			name:       "multiple IPs in X-Forwarded-For",
+			xffHeader:  "10.0.0.1, 192.168.1.100, 172.16.0.1",
+			remoteAddr: "192.168.1.100:12345",
+			expectedIP: "10.0.0.1",
+		},
+		{
+			name:       "X-Forwarded-For with spaces",
+			xffHeader:  "  10.0.0.1  ,  192.168.1.100  ",
+			remoteAddr: "192.168.1.100:12345",
+			expectedIP: "10.0.0.1",
+		},
+		{
+			name:       "invalid RemoteAddr",
+			xffHeader:  "",
+			remoteAddr: "invalid",
+			expectedIP: "invalid",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/archive", nil)
+			if tt.xffHeader != "" {
+				req.Header.Set("X-Forwarded-For", tt.xffHeader)
+			}
+			req.RemoteAddr = tt.remoteAddr
+
+			result := getClientIP(req)
+			if result != tt.expectedIP {
+				t.Errorf("getClientIP() = %q, expected %q", result, tt.expectedIP)
+			}
+		})
+	}
+}
+
+// TestGetCompressionAlgorithm tests the getCompressionAlgorithm function.
+func TestGetCompressionAlgorithm(t *testing.T) {
+	tests := []struct {
+		name     string
+		ext      string
+		expected string
+	}{
+		{
+			name:     "tar.bz2",
+			ext:      "tar.bz2",
+			expected: "bzip2",
+		},
+		{
+			name:     "tar.zst",
+			ext:      "tar.zst",
+			expected: "zstd",
+		},
+		{
+			name:     "tar.lz4",
+			ext:      "tar.lz4",
+			expected: "lz4",
+		},
+		{
+			name:     "tar.xz",
+			ext:      "tar.xz",
+			expected: "xz",
+		},
+		{
+			name:     "tar.gz",
+			ext:      "tar.gz",
+			expected: "pgzip",
+		},
+		{
+			name:     "default with gzip config",
+			ext:      "",
+			expected: "gzip",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			C = Config{DefaultCompression: "gzip"}
+			result := getCompressionAlgorithm(tt.ext)
+			if result != tt.expected {
+				t.Errorf("getCompressionAlgorithm(%q) = %q, expected %q", tt.ext, result, tt.expected)
+			}
+		})
+	}
+}
 
 // TestNewServerSuccess tests successful server creation.
 func TestNewServerSuccess(t *testing.T) {

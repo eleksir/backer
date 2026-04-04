@@ -24,7 +24,7 @@
     "password": "SharpShooter",
 
     /* Where to store logs.                                                                                           */
-    "log": "/var/log/backer.log",
+    "log": "../../test_data/tmp/backer.log",
 
     /* Verbosity of logs                                                                                              */
     "loglevel": "info",
@@ -39,5 +39,5 @@
     "backup_timeout": 60,
 
     /* Gzip compression level (1-9, where 9 is best compression).                                                    */
-    "compression_level": 6
+    "compression_level": 3
 }

@@ -74,6 +74,7 @@ linters:
         - paramTypeCombine
         - whyNoLint
         - hugeParam
+        - unnamedResult
     godoclint:
       default: all
       ignore-unexported: false

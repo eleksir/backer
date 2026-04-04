@@ -78,6 +78,8 @@ func NewServer(configPath string) (*serverWrapper, error) { //nolint: revive
 			w.Header().Set("WWW-Authenticate", `Basic realm="restricted", charset="UTF-8"`)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 
+			log.Infof("Access denied from %s to %s (no username or password given)", r.RemoteAddr, r.RequestURI)
+
 			return
 		}
 
@@ -87,6 +89,8 @@ func NewServer(configPath string) (*serverWrapper, error) { //nolint: revive
 		if !(username == C.User && password == C.Password) {
 			w.Header().Set("WWW-Authenticate", `Basic realm="restricted", charset="UTF-8"`)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+
+			log.Infof("Access denied from %s to %s (username and/or password incorrect)", r.RemoteAddr, r.RequestURI)
 
 			return
 		}
@@ -273,8 +277,8 @@ func getCompressionAlgorithm(requestedExt string) string {
 	}
 }
 
-// serverWrapper wraps http.Server to intercept and classify errors.
 type (
+	// serverWrapper wraps [http.Server] to intercept and classify errors.
 	serverWrapper struct {
 		*http.Server
 	}

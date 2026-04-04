@@ -16,7 +16,7 @@ var (
 	Log *os.File
 )
 
-// slogWriter implements io.Writer to redirect standard log to slog.
+// slogWriter implements [io.Writer] to redirect standard log to slog.
 type (
 	slogWriter struct {
 		handler slog.Handler
@@ -145,7 +145,7 @@ func DebugLogger() *log.Logger {
 	return log.New(&slogWriter{handler: handler}, "", 0)
 }
 
-// Write implements io.Writer. It differentiates TLS/SSL errors from other errors.
+// Write implements [io.Writer]. It differentiates TLS/SSL errors from other errors.
 // TLS-related errors are logged at debug level, while other errors (handler issues,
 // unexpected behavior) are logged at warn level.
 func (w *slogWriter) Write(p []byte) (int, error) {

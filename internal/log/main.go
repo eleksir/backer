@@ -8,12 +8,20 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
 var (
 	// Log contains *[os.File] pointing to log file descriptor.
+	// Protected by mu for thread-safe access, primarily to enable parallel tests.
+	// In production, this is set once at startup and never modified thereafter.
 	Log *os.File
+
+	// mu protects Log during initialization and when DebugLogger is called.
+	// This is necessary to allow parallel test execution where each test
+	// may initialize the logger with a different log file.
+	mu sync.RWMutex
 )
 
 // slogWriter implements [io.Writer] to redirect standard log to slog.
@@ -25,13 +33,22 @@ type (
 
 // Init sets up logger stuff.
 // level can be error, warn, info, debug; if something other is supplied, info level is selected.
+// Thread-safe: uses mutex to allow parallel test execution.
 func Init(level, filename string) error {
+	mu.Lock()
+	defer mu.Unlock()
+
 	var (
 		err      error
 		loglevel slog.Level
 	)
 
 	if filename != "" {
+		// Close existing log file if re-initializing (e.g., in tests).
+		if Log != nil && Log != os.Stderr {
+			Log.Close()
+		}
+
 		Log, err = os.OpenFile(filename, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
 
 		if err != nil {
@@ -136,6 +153,9 @@ func Debugf(format string, a ...any) {
 // This is useful for assigning to http.Server.ErrorLog to move TLS handshake
 // and other client-side errors to debug level.
 func DebugLogger() *log.Logger {
+	mu.RLock()
+	defer mu.RUnlock()
+
 	opts := &slog.HandlerOptions{
 		Level: slog.LevelDebug,
 	}
@@ -186,7 +206,11 @@ func Fatalf(format string, a ...any) {
 }
 
 // Close closes log file descriptor.
+// Thread-safe: uses mutex to coordinate with Init and DebugLogger.
 func Close() {
+	mu.Lock()
+	defer mu.Unlock()
+
 	if Log == nil || Log == os.Stderr {
 		return
 	}
@@ -195,6 +219,8 @@ func Close() {
 		msg := fmt.Sprintln("Failed to close log file:", err)
 		slog.Error(msg)
 	}
+
+	Log = nil
 }
 
 /* vim: setlocal ft=go noet ai ts=4 sw=4 sts=4: */

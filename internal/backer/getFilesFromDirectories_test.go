@@ -3,6 +3,7 @@ package backer
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -16,24 +17,32 @@ func normalizePath(p string) string {
 
 // TestGetFilesFromDirectories checks if GetFilesFromDirectories returns the proper amount of strings, correct strings and no error.
 func TestGetFilesFromDirectories(t *testing.T) {
-	// Ensure empty_dir exists for the test.
-	os.MkdirAll("../../test_data/test1/foo/empty_dir", 0755)
+	testDataPath := filepath.Join("..", "test_data")
+
+	// Log the paths we're checking for debugging
+	t.Logf("Checking directories: %v", []string{
+		filepath.Join(testDataPath, "test1", "foo"),
+		filepath.Join(testDataPath, "test1", "bar"),
+	})
 
 	var (
 		input = Config{
-			Directories: []string{"../../test_data/test1/foo", "../../test_data/test1/bar"},
+			Directories: []string{
+				filepath.Join(testDataPath, "test1", "foo"),
+				filepath.Join(testDataPath, "test1", "bar"),
+			},
 		}
 		expectedData = []string{
-			"../../test_data/test1/foo",
-			"../../test_data/test1/foo/empty_dir",
-			"../../test_data/test1/foo/hello_breakfast.txt",
-			"../../test_data/test1/foo/mydir",
-			"../../test_data/test1/foo/mydir/myfile.txt",
-			"../../test_data/test1/foo/some_text.txt",
-			"../../test_data/test1/bar",
-			"../../test_data/test1/bar/goodbye.txt",
-			"../../test_data/test1/bar/goodbye.txt/text.txt",
-			"../../test_data/test1/bar/hello.txt",
+			filepath.Join(testDataPath, "test1", "foo"),
+			filepath.Join(testDataPath, "test1", "foo", "empty_dir"),
+			filepath.Join(testDataPath, "test1", "foo", "hello_breakfast.txt"),
+			filepath.Join(testDataPath, "test1", "foo", "mydir"),
+			filepath.Join(testDataPath, "test1", "foo", "mydir", "myfile.txt"),
+			filepath.Join(testDataPath, "test1", "foo", "some_text.txt"),
+			filepath.Join(testDataPath, "test1", "bar"),
+			filepath.Join(testDataPath, "test1", "bar", "goodbye.txt"),
+			filepath.Join(testDataPath, "test1", "bar", "goodbye.txt", "text.txt"),
+			filepath.Join(testDataPath, "test1", "bar", "hello.txt"),
 		}
 	)
 
@@ -60,7 +69,8 @@ func TestGetFilesFromDirectories(t *testing.T) {
 
 // TestGetFilesFromDirectoriesSingleDir tests with a single directory.
 func TestGetFilesFromDirectoriesSingleDir(t *testing.T) {
-	output, err := GetFilesFromDirectories(context.Background(), []string{"../../test_data/test1/foo"})
+	testDataPath := filepath.Join("test_data")
+	output, err := GetFilesFromDirectories(context.Background(), []string{filepath.Join(testDataPath, "test1", "foo")})
 
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
@@ -71,7 +81,7 @@ func TestGetFilesFromDirectoriesSingleDir(t *testing.T) {
 	}
 
 	// Should contain the directory itself
-	if !slices.Contains(output, "../../test_data/test1/foo") {
+	if !slices.Contains(output, filepath.Join(testDataPath, "test1", "foo")) {
 		t.Error("Output should contain the root directory")
 	}
 }
@@ -96,7 +106,9 @@ func TestGetFilesFromDirectoriesEmptyDir(t *testing.T) {
 // TestGetFilesFromDirectoriesNonExistent tests with non-existent directory.
 // Should log error but not fail - returns empty list.
 func TestGetFilesFromDirectoriesNonExistent(t *testing.T) {
-	output, err := GetFilesFromDirectories(context.Background(), []string{"/nonexistent/path/that/does/not/exist"})
+	testDataPath := filepath.Join("test_data")
+	nonExistentPath := filepath.Join(testDataPath, "nonexistent", "path", "that", "does", "not", "exist")
+	output, err := GetFilesFromDirectories(context.Background(), []string{nonExistentPath})
 
 	// Should not return error, but logs error
 	if err != nil {
@@ -111,10 +123,11 @@ func TestGetFilesFromDirectoriesNonExistent(t *testing.T) {
 
 // TestGetFilesFromDirectoriesPartialFailure tests with mix of valid and invalid directories.
 func TestGetFilesFromDirectoriesPartialFailure(t *testing.T) {
+	testDataPath := filepath.Join("test_data")
 	// Create a temp directory that exists
 	tmpDir := t.TempDir()
 
-	output, err := GetFilesFromDirectories(context.Background(), []string{tmpDir, "/nonexistent/path/that/does/not/exist"})
+	output, err := GetFilesFromDirectories(context.Background(), []string{tmpDir, filepath.Join(testDataPath, "nonexistent", "path", "that", "does", "not", "exist")})
 
 	// Should not return error, but logs error
 	if err != nil {
@@ -129,9 +142,10 @@ func TestGetFilesFromDirectoriesPartialFailure(t *testing.T) {
 
 // TestGetFilesFromDirectoriesMultipleDirs tests multiple directories.
 func TestGetFilesFromDirectoriesMultipleDirs(t *testing.T) {
+	testDataPath := filepath.Join("test_data")
 	output, err := GetFilesFromDirectories(context.Background(), []string{
-		"../../test_data/test1/foo",
-		"../../test_data/test1/bar",
+		filepath.Join(testDataPath, "test1", "foo"),
+		filepath.Join(testDataPath, "test1", "bar"),
 	})
 
 	if err != nil {
@@ -140,10 +154,10 @@ func TestGetFilesFromDirectoriesMultipleDirs(t *testing.T) {
 
 	// Should contain entries from both directories
 	hasFoo := slices.ContainsFunc(output, func(s string) bool {
-		return s == "../../test_data/test1/foo" || s == "../../test_data/test1/foo/hello_breakfast.txt"
+		return s == filepath.Join(testDataPath, "test1", "foo") || s == filepath.Join(testDataPath, "test1", "foo", "hello_breakfast.txt")
 	})
 	hasBar := slices.ContainsFunc(output, func(s string) bool {
-		return s == "../../test_data/test1/bar" || s == "../../test_data/test1/bar/hello.txt"
+		return s == filepath.Join(testDataPath, "test1", "bar") || s == filepath.Join(testDataPath, "test1", "bar", "hello.txt")
 	})
 
 	if !hasFoo {

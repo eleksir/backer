@@ -351,7 +351,7 @@ func TestHandlerArchiveStream(t *testing.T) {
 		}
 
 		ctx := r.Context()
-		files, err := GetFilesFromDirectories(C.Directories)
+		files, err := GetFilesFromDirectories(ctx, C.Directories)
 		if err != nil {
 			http.Error(w, "Failed to get files", http.StatusInternalServerError)
 			return

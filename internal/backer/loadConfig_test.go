@@ -1,7 +1,9 @@
 package backer
 
 import (
+	"encoding/json"
 	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 )
@@ -10,18 +12,46 @@ func TestLoadConfig(t *testing.T) {
 	// Reset global config
 	C = Config{}
 
-	var (
-		testConfigPath = "./../../test_data/test_config.json"
-		expectedData   = Config{
-			Address: "127.0.0.1",
-			Port:    8086,
-			Directories: []string{
-				"../../test_data/test1/foo",
-				"../../test_data/test1/bar",
-			},
-			Location: "/archive",
-		}
-	)
+	testDataPath := filepath.Join(t.TempDir(), "test_data")
+	os.MkdirAll(filepath.Join(testDataPath, "test1", "foo"), 0755)
+	os.MkdirAll(filepath.Join(testDataPath, "test1", "bar"), 0755)
+
+	// Create test config file
+	testConfigPath := filepath.Join(testDataPath, "test_config.json")
+	testStruct := struct {
+		Address     string   `json:"address"`
+		Port        int      `json:"port"`
+		Directories []string `json:"directories"`
+		Location    string   `json:"location"`
+		User        string   `json:"user"`
+		Password    string   `json:"password"`
+		NoHTTPS     bool     `json:"nohttps"`
+	}{
+		Address:     "127.0.0.1",
+		Port:        8086,
+		Directories: []string{filepath.Join(testDataPath, "test1", "foo"), filepath.Join(testDataPath, "test1", "bar")},
+		Location:    "/archive",
+		User:        "test",
+		Password:    "test",
+		NoHTTPS:     true,
+	}
+	testConfigBytes, _ := json.MarshalIndent(testStruct, "", "  ")
+	if err := os.WriteFile(testConfigPath, testConfigBytes, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	expectedData := Config{
+		Address: "127.0.0.1",
+		Port:    8086,
+		Directories: []string{
+			filepath.Join(testDataPath, "test1", "foo"),
+			filepath.Join(testDataPath, "test1", "bar"),
+		},
+		Location: "/archive",
+		User:     "test",
+		Password: "test",
+		NoHTTPS:  true,
+	}
 
 	err := LoadConfig(testConfigPath)
 
@@ -57,6 +87,8 @@ func TestLoadConfig(t *testing.T) {
 
 // TestLoadConfigMissingUser tests that config fails when user is missing.
 func TestLoadConfigMissingUser(t *testing.T) {
+	// Reset global config
+	C = Config{}
 	config := `{
 		"port": 8086,
 		"password": "test",
@@ -72,6 +104,8 @@ func TestLoadConfigMissingUser(t *testing.T) {
 
 // TestLoadConfigMissingPassword tests that config fails when password is missing.
 func TestLoadConfigMissingPassword(t *testing.T) {
+	// Reset global config
+	C = Config{}
 	config := `{
 		"port": 8086,
 		"user": "test",
@@ -87,6 +121,8 @@ func TestLoadConfigMissingPassword(t *testing.T) {
 
 // TestLoadConfigMissingDirectories tests that config fails when directories is missing.
 func TestLoadConfigMissingDirectories(t *testing.T) {
+	// Reset global config
+	C = Config{}
 	config := `{
 		"port": 8086,
 		"user": "test",
@@ -102,6 +138,8 @@ func TestLoadConfigMissingDirectories(t *testing.T) {
 
 // TestLoadConfigInvalidPort tests that config fails with invalid port.
 func TestLoadConfigInvalidPort(t *testing.T) {
+	// Reset global config
+	C = Config{}
 	config := `{
 		"port": 99999,
 		"user": "test",
@@ -118,6 +156,8 @@ func TestLoadConfigInvalidPort(t *testing.T) {
 
 // TestLoadConfigNonExistentDirectory tests that config fails with non-existent directory.
 func TestLoadConfigNonExistentDirectory(t *testing.T) {
+	// Reset global config
+	C = Config{}
 	config := `{
 		"port": 8086,
 		"user": "test",
@@ -134,6 +174,8 @@ func TestLoadConfigNonExistentDirectory(t *testing.T) {
 
 // TestLoadConfigHTTPSWithoutCert tests that config fails when HTTPS enabled but no cert.
 func TestLoadConfigHTTPSWithoutCert(t *testing.T) {
+	// Reset global config
+	C = Config{}
 	config := `{
 		"port": 8086,
 		"user": "test",
@@ -151,6 +193,8 @@ func TestLoadConfigHTTPSWithoutCert(t *testing.T) {
 
 // TestLoadConfigNoHTTPS tests that config succeeds with nohttps=true and no cert.
 func TestLoadConfigNoHTTPS(t *testing.T) {
+	// Reset global config
+	C = Config{}
 	config := `{
 		"port": 8086,
 		"user": "test",
@@ -172,6 +216,8 @@ func TestLoadConfigNoHTTPS(t *testing.T) {
 
 // TestLoadConfigFilenamePrefixCustom tests custom filename prefix.
 func TestLoadConfigFilenamePrefixCustom(t *testing.T) {
+	// Reset global config
+	C = Config{}
 	config := `{
 		"user": "test",
 		"password": "test",
@@ -193,6 +239,8 @@ func TestLoadConfigFilenamePrefixCustom(t *testing.T) {
 
 // TestLoadConfigDefaultValues tests default values are set correctly.
 func TestLoadConfigDefaultValues(t *testing.T) {
+	// Reset global config
+	C = Config{}
 	config := `{
 		"user": "test",
 		"password": "test",
@@ -234,6 +282,8 @@ func TestLoadConfigDefaultValues(t *testing.T) {
 
 // TestLoadConfigCompressionAlgorithmBzip2 tests bzip2 compression algorithm.
 func TestLoadConfigCompressionAlgorithmBzip2(t *testing.T) {
+	// Reset global config
+	C = Config{}
 	config := `{
 		"user": "test",
 		"password": "test",
@@ -255,6 +305,8 @@ func TestLoadConfigCompressionAlgorithmBzip2(t *testing.T) {
 
 // TestLoadConfigCompressionAlgorithmZstd tests zstd compression algorithm.
 func TestLoadConfigCompressionAlgorithmZstd(t *testing.T) {
+	// Reset global config
+	C = Config{}
 	config := `{
 		"user": "test",
 		"password": "test",
@@ -276,6 +328,8 @@ func TestLoadConfigCompressionAlgorithmZstd(t *testing.T) {
 
 // TestLoadConfigCompressionAlgorithmLz4 tests lz4 compression algorithm.
 func TestLoadConfigCompressionAlgorithmLz4(t *testing.T) {
+	// Reset global config
+	C = Config{}
 	config := `{
 		"user": "test",
 		"password": "test",
@@ -297,6 +351,8 @@ func TestLoadConfigCompressionAlgorithmLz4(t *testing.T) {
 
 // TestLoadConfigCompressionAlgorithmXz tests xz compression algorithm.
 func TestLoadConfigCompressionAlgorithmXz(t *testing.T) {
+	// Reset global config
+	C = Config{}
 	config := `{
 		"user": "test",
 		"password": "test",
@@ -318,6 +374,8 @@ func TestLoadConfigCompressionAlgorithmXz(t *testing.T) {
 
 // TestLoadConfigCompressionAlgorithmPgzip tests pgzip compression algorithm.
 func TestLoadConfigCompressionAlgorithmPgzip(t *testing.T) {
+	// Reset global config
+	C = Config{}
 	config := `{
 		"user": "test",
 		"password": "test",
@@ -339,6 +397,8 @@ func TestLoadConfigCompressionAlgorithmPgzip(t *testing.T) {
 
 // TestLoadConfigCompressionAlgorithmInvalid tests invalid compression algorithm.
 func TestLoadConfigCompressionAlgorithmInvalid(t *testing.T) {
+	// Reset global config
+	C = Config{}
 	config := `{
 		"user": "test",
 		"password": "test",
@@ -367,7 +427,6 @@ func writeTempConfig(t *testing.T, content string) string {
 	tmpFile.Close()
 	// Reset global config before loading
 	C = Config{}
-	excludePatterns = nil
 	return tmpFile.Name()
 }
 

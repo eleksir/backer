@@ -34,6 +34,8 @@ func NewServer(configPath string) (*http.Server, error) {
 		log.Errorf("Failed to initialize logger: %v", err)
 	}
 
+	log.Infof("Using %s as default compression algorithm", C.DefaultCompression)
+
 	mux := http.NewServeMux()
 
 	mux.HandleFunc(C.Location, func(w http.ResponseWriter, r *http.Request) {

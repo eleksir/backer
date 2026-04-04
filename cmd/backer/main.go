@@ -40,7 +40,7 @@ func main() {
 		log.Fatalf("Failed to create server: %v", err)
 	}
 
-	log.Infof("Starting server at %s", server.Addr)
+	log.Infof("Starting backer version %s at %s", version, server.Addr)
 
 	if backer.C.NoHTTPS {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {

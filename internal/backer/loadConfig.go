@@ -146,7 +146,7 @@ func LoadConfig(path string) error {
 
 	switch C.DefaultCompression {
 	case "gzip", "pgzip", "bzip2", "xz", "lz4", "zstd":
-		log.Infof("Using %s as defailt compression algorithm", C.DefaultCompression)
+		log.Infof("Using %s as default compression algorithm", C.DefaultCompression)
 	default:
 		return fmt.Errorf("Config option default_compression must be gzip, bzip2, zstd, lz4, xz or pgzip, got %s", C.DefaultCompression)
 	}

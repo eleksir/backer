@@ -15,12 +15,23 @@ type (
 		LogLevel             string   `json:"loglevel"`
 		Directories          []string `json:"directories"`
 		BackupTimeout        int      `json:"backup_timeout"`        // Timeout in minutes for backup streaming.
+		DirScanTimeout       int      `json:"dir_scan_timeout"`      // Timeout in minutes for directory scanning.
 		CompressionLevel     int      `json:"compression_level"`     // Compression level (1-9, default 9).
 		ExcludePatterns      []string `json:"exclude_patterns"`      // Regex patterns to exclude from backup.
 		FilenamePrefix       string   `json:"filename_prefix"`       // Prefix for backup filename (default: "backup").
 		CompressionAlgorithm string   `json:"compression_algorithm"` // Compression algorithm alias (deprecated: use default_compression).
 		DefaultCompression   string   `json:"default_compression"`   // Default compression algorithm: gzip, pgzip, bzip2, zstd, lz4 or xz.
 	}
+
+	// ErrDirectoryScanTimeout is returned when directory scan times out.
+	ErrDirectoryScanTimeout struct {
+		ScannedFiles int
+	}
 )
+
+// Error returns the error message for ErrDirectoryScanTimeout.
+func (e ErrDirectoryScanTimeout) Error() string {
+	return "Directory scan timed out"
+}
 
 /* vim: setlocal ft=go noet ai ts=4 sw=4 sts=4: */

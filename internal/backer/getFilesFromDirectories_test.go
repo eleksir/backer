@@ -1,6 +1,7 @@
 package backer
 
 import (
+	"context"
 	"os"
 	"regexp"
 	"slices"
@@ -36,7 +37,7 @@ func TestGetFilesFromDirectories(t *testing.T) {
 		}
 	)
 
-	output, err := GetFilesFromDirectories(input.Directories)
+	output, err := GetFilesFromDirectories(context.Background(), input.Directories)
 
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
@@ -59,7 +60,7 @@ func TestGetFilesFromDirectories(t *testing.T) {
 
 // TestGetFilesFromDirectoriesSingleDir tests with a single directory.
 func TestGetFilesFromDirectoriesSingleDir(t *testing.T) {
-	output, err := GetFilesFromDirectories([]string{"../../test_data/test1/foo"})
+	output, err := GetFilesFromDirectories(context.Background(), []string{"../../test_data/test1/foo"})
 
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
@@ -80,7 +81,7 @@ func TestGetFilesFromDirectoriesEmptyDir(t *testing.T) {
 	// Create temp empty dir
 	tmpDir := t.TempDir()
 
-	output, err := GetFilesFromDirectories([]string{tmpDir})
+	output, err := GetFilesFromDirectories(context.Background(), []string{tmpDir})
 
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
@@ -95,7 +96,7 @@ func TestGetFilesFromDirectoriesEmptyDir(t *testing.T) {
 // TestGetFilesFromDirectoriesNonExistent tests with non-existent directory.
 // Should log error but not fail - returns empty list.
 func TestGetFilesFromDirectoriesNonExistent(t *testing.T) {
-	output, err := GetFilesFromDirectories([]string{"/nonexistent/path/that/does/not/exist"})
+	output, err := GetFilesFromDirectories(context.Background(), []string{"/nonexistent/path/that/does/not/exist"})
 
 	// Should not return error, but logs error
 	if err != nil {
@@ -113,7 +114,7 @@ func TestGetFilesFromDirectoriesPartialFailure(t *testing.T) {
 	// Create a temp directory that exists
 	tmpDir := t.TempDir()
 
-	output, err := GetFilesFromDirectories([]string{tmpDir, "/nonexistent/path/that/does/not/exist"})
+	output, err := GetFilesFromDirectories(context.Background(), []string{tmpDir, "/nonexistent/path/that/does/not/exist"})
 
 	// Should not return error, but logs error
 	if err != nil {
@@ -128,7 +129,7 @@ func TestGetFilesFromDirectoriesPartialFailure(t *testing.T) {
 
 // TestGetFilesFromDirectoriesMultipleDirs tests multiple directories.
 func TestGetFilesFromDirectoriesMultipleDirs(t *testing.T) {
-	output, err := GetFilesFromDirectories([]string{
+	output, err := GetFilesFromDirectories(context.Background(), []string{
 		"../../test_data/test1/foo",
 		"../../test_data/test1/bar",
 	})
@@ -170,7 +171,7 @@ func TestGetFilesFromDirectoriesSymlink(t *testing.T) {
 		t.Skip("Symlinks not supported, skipping test")
 	}
 
-	output, err := GetFilesFromDirectories([]string{tmpDir})
+	output, err := GetFilesFromDirectories(context.Background(), []string{tmpDir})
 
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
@@ -249,7 +250,7 @@ func TestGetFilesFromDirectoriesWithExcludes(t *testing.T) {
 		regexp.MustCompile(`\.tmp$`),
 	}
 
-	output, err := GetFilesFromDirectories([]string{tmpDir})
+	output, err := GetFilesFromDirectories(context.Background(), []string{tmpDir})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

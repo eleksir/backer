@@ -101,14 +101,26 @@ func NewServer(configPath string) (*ServerWrapper, error) {
 
 		log.Infof("Backup started: client=%s user=%s", clientIP, username)
 
-		ctx := r.Context()
-		files, err := GetFilesFromDirectories(C.Directories)
+		// Create context with dir_scan_timeout from request context.
+		ctx, cancel := context.WithTimeout(r.Context(), time.Duration(C.DirScanTimeout)*time.Minute)
+		defer cancel()
+
+		files, err := GetFilesFromDirectories(ctx, C.Directories)
 
 		if err != nil {
-			log.Errorf("Failed to get files: %v", err)
+			switch {
+			case errors.Is(err, context.DeadlineExceeded):
+				w.Header().Set("Server", "backer")
+				http.Error(w, "Directory scan timed out", http.StatusRequestTimeout)
 
-			w.Header().Set("Server", "backer")
-			http.Error(w, "Failed to get files", http.StatusInternalServerError)
+				log.Errorf("Directory scan timed out: %v", err)
+
+			default:
+				log.Errorf("Failed to get files: %v", err)
+
+				w.Header().Set("Server", "backer")
+				http.Error(w, "Failed to get files", http.StatusInternalServerError)
+			}
 
 			return
 		}

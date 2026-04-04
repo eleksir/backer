@@ -29,6 +29,12 @@ const (
 	// backupTimeoutMax is the maximum backup timeout in minutes (24 hours).
 	backupTimeoutMax = 1440
 
+	// dirScanTimeoutMin is the minimum directory scan timeout in minutes.
+	dirScanTimeoutMin = 1
+
+	// dirScanTimeoutMax is the maximum directory scan timeout in minutes (24 hours).
+	dirScanTimeoutMax = 1440
+
 	// compressionLevelMin is the minimum compression level.
 	compressionLevelMin = 1
 
@@ -40,6 +46,9 @@ const (
 
 	// defaultBackupTimeout is the default backup timeout in minutes.
 	defaultBackupTimeout = 60
+
+	// defaultDirScanTimeout is the default directory scan timeout in minutes (1 hour).
+	defaultDirScanTimeout = 60
 
 	// defaultCompressionLevel is the default compression level.
 	defaultCompressionLevel = 9

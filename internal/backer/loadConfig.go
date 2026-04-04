@@ -95,6 +95,17 @@ func LoadConfig(path string) error {
 		return fmt.Errorf("Config option backup_timeout must be between %d and %d minutes, got %d", backupTimeoutMin, backupTimeoutMax, C.BackupTimeout)
 	}
 
+	// DirScanTimeout: set default, then validate range.
+	if C.DirScanTimeout == 0 {
+		C.DirScanTimeout = defaultDirScanTimeout
+
+		log.Warnf("Config option dir_scan_timeout is not set, fallback to %d minutes", C.DirScanTimeout)
+	}
+
+	if C.DirScanTimeout < dirScanTimeoutMin || C.DirScanTimeout > dirScanTimeoutMax {
+		return fmt.Errorf("Config option dir_scan_timeout must be between %d and %d minutes, got %d", dirScanTimeoutMin, dirScanTimeoutMax, C.DirScanTimeout)
+	}
+
 	// CompressionLevel: set default, then validate range.
 	if C.CompressionLevel == 0 {
 		C.CompressionLevel = defaultCompressionLevel

@@ -20,7 +20,7 @@ Backer is a Go-based HTTP/HTTPS backup server that creates compressed archives o
 - **Use tags and labels.** In comments, add tags or labels to files, classes, or functions to categorize them based on functionality, domain concepts, or design patterns.
 - **Avoid obvious comments that do not add value.**
 - **Remove dead code.** A half-finished refactoring can actually harm the contributions.
-- **Update AGENTS.md and TODO.md automatically.** Keep AGENTS.md dense, detailed and concise.
+- **Update AGENTS.md automatically.** Keep AGENTS.md dense, detailed and concise.
 
 ## Workflow Rules
 
@@ -129,10 +129,12 @@ CompressionLevel  int `json:"compression_level"`
 The following are intentional design decisions, not bugs or defects:
 
 - **No rate limiting**: Backups are assumed to be infrequent enough that rate limiting is unnecessary.
+- **Backup scheduling**: Client-side decision — server serves backups on-request only.
 - **Basic Auth only**: HTTP Basic Auth is sufficient for a backup server behind a firewall.
 - **Global config**: The `C Config` global variable is intentional — config is loaded once at startup.
 - **No incremental backup**: Each backup is a full snapshot, not incremental.
 - **Credentials in config file**: Config file should have restricted permissions (documented).
+- **Thread-safe logging**: The global `Log` variable uses mutex protection to enable parallel test execution; this is not needed for single-server production use but allows tests to run in parallel without race conditions.
 
 ## Project Structure
 
@@ -238,13 +240,13 @@ No temp files on disk. Uses `io.Pipe` with a goroutine to stream archives on-the
 
 Two helper functions in `newServer.go` handle context cancellation during streaming:
 - `writeWithContext(ctx, fn)` — checks context before calling fn
-- `copyWithContext(ctx, dst, src)` — buffered copy (32KB) with cancellation checks
+- `copyWithContext(ctx, dst, src)` — buffered copy (32KB) with cancellation checks, computes MD5 hash of copied data
 
 ### Special File Type Handling
 
 - **Regular files**: streamed into tar archive with content
 - **Directories**: included as tar directory entries
-- **Symlinks**: stored as symlink entries (target path preserved)
+- **Symlinks**: stored as symlink entries (target path preserved). Backer never resolves or follows symlinks during directory traversal — it uses `os.Lstat` and `filepath.WalkDir` which do not follow symlinks. This means symlink cycles are impossible to occur.
 - **Device files** (char/block): included with correct major/minor
 - **Named pipes**: included (header only, no data)
 - **Sockets**: skipped (not archivable)
@@ -256,7 +258,7 @@ Two helper functions in `newServer.go` handle context cancellation during stream
 
 ### Auth Handler
 
-HTTP Basic Auth. Both username AND password must match exactly. Returns `401 Unauthorized` with `WWW-Authenticate` header on failure. The condition is intentionally written without De Morgan's law simplification for clarity (linter suppression `//nolint:staticcheck`).
+HTTP Basic Auth. Both username AND password must match exactly. Returns `401 Unauthorized` with `WWW-Authenticate` header on failure. Uses timing-safe comparison to prevent timing attacks. The condition is intentionally written without De Morgan's law simplification for clarity (linter suppression `//nolint:staticcheck`).
 
 ### Client IP Detection
 
@@ -266,17 +268,55 @@ Checks `X-Forwarded-For` header first (for proxied requests), then falls back to
 
 - `ReadHeaderTimeout`: 5 seconds
 - `WriteTimeout`: configurable via `backup_timeout` (converted to `time.Duration`)
+- `IdleTimeout`: 10 seconds (for keep-alive connections; backer disables keep-alives explicitly)
+- `MaxHeaderBytes`: 1KB (prevents header-based DoS attacks)
+- `DisableKeepAlives`: true (each connection closed after request, no connection reuse)
 - TLS minimum version: TLS 1.3 (when HTTPS enabled)
 
 ### TLS Error Handling
 
-The server uses a `serverWrapper` type to intercept and classify errors from `Serve()` and `ServeTLS()`. TLS-specific errors are logged at debug level to reduce log clutter:
+The server uses a `ServerWrapper` type to intercept and classify errors from `Serve()` and `ServeTLS()`. TLS-specific errors are logged at debug level to reduce log clutter:
 
 - Uses `errors.As` to detect TLS error types: `tls.AlertError`, `tls.CertificateVerificationError`, `tls.ECHRejectionError`, `tls.RecordHeaderError`
 - Also checks for "tls:" prefix in error messages
 - Additionally uses `http.Server.ErrorLog` with a custom logger that writes at debug level for net/http's internal TLS-related messages
 
 This ensures client-side TLS errors (handshake failures, certificate issues) don't clutter production logs.
+
+### Compression Level Mapping
+
+The `compression_level` config option (1-9) is mapped differently for each compression algorithm:
+
+| Algorithm | Level Mapping |
+|-----------|----------------|
+| gzip | 1-9 directly maps to gzip compression levels |
+| pgzip | 1-9 directly maps to pgzip compression levels |
+| bzip2 | 1-9 directly maps to bzip2 compression levels |
+| zstd | 1-3: Fastest, 4-6: Default, 7-9: BetterCompression |
+| lz4 | 1-3: Fastest (0), 4-6: Default (1), 7-9: Best (2) |
+| xz | Uses default compression (no configurable level) |
+
+### HTTP Routing & Compression Selection
+
+The server uses `http.NewServeMux()` for routing. Multiple routes are registered to support different compression formats:
+
+```go
+mux.Handle(C.Location, http.HandlerFunc(backupHandler))           // /archive
+mux.Handle(C.Location+"/", http.HandlerFunc(backupHandler))       // /archive/
+mux.Handle(C.Location+".tar.gz", http.HandlerFunc(backupHandler))  // /archive.tar.gz
+mux.Handle(C.Location+".tar.xz", http.HandlerFunc(backupHandler))   // /archive.tar.xz
+mux.Handle(C.Location+".tar.bz2", http.HandlerFunc(backupHandler)) // /archive.tar.bz2
+// ... etc
+```
+
+The compression algorithm is determined by extracting the extension from the request path using `path.Ext()`:
+- For `/archive.tar.xz`, `path.Ext()` returns `.tar.xz` → maps to xz
+- For `/archive`, `path.Ext()` returns `""` → uses default compression
+
+The `getCompressionAlgorithm()` function handles both full paths and bare extensions:
+- Full path: `/archive.tar.xz` → `.tar.xz` → xz
+- Bare extension: `tar.xz` → `.tar.xz` → xz
+- Single ext: `xz` → `.xz` → xz
 
 ## Dependencies
 

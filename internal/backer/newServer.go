@@ -2,6 +2,7 @@ package backer
 
 import (
 	"context"
+	"crypto/subtle"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -83,10 +84,8 @@ func NewServer(configPath string) (*ServerWrapper, error) {
 			return
 		}
 
-		// Both username AND password must match. Explicitly require that the whole condition
-		// fails when either is incorrect, per the authentication design.
-		//nolint:staticcheck // QF1001: De Morgan's law is irrelevant here.
-		if !(username == C.User && password == C.Password) {
+		// Both username AND password must match. Use timing-safe comparison to prevent timing attacks.
+		if !timingSafeMatch(username, C.User) || !timingSafeMatch(password, C.Password) {
 			w.Header().Set("WWW-Authenticate", `Basic realm="restricted", charset="UTF-8"`)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 
@@ -319,6 +318,12 @@ func (sw *ServerWrapper) ServeTLS(certFile, keyFile string) error {
 	}
 
 	return err
+}
+
+// timingSafeMatch performs constant-time comparison to prevent timing attacks.
+// Returns 1 if the strings are equal, 0 otherwise.
+func timingSafeMatch(a, b string) bool {
+	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
 }
 
 /* vim: setlocal ft=go noet ai ts=4 sw=4 sts=4: */

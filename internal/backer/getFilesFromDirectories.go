@@ -1,10 +1,12 @@
 package backer
 
 import (
+	"errors"
 	"io/fs"
+	"os"
 	"path/filepath"
 
-	"backer/internal/log"
+	backerlog "backer/internal/log"
 )
 
 // isExcluded checks if path matches any of the configured exclude patterns.
@@ -22,19 +24,31 @@ func isExcluded(path string) bool {
 }
 
 // GetFilesFromDirectories makes a file list of given directories.
+// Logs errors for directories that don't exist or can't be accessed but continues with valid directories.
 func GetFilesFromDirectories(directories []string) ([]string, error) {
 	var files []string
 
 	for _, dir := range directories {
+		// Check directory exists before walking.
+		if _, err := os.Stat(dir); err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				backerlog.Errorf("Configured backup directory not found: %s", dir)
+			} else {
+				backerlog.Errorf("Failed to access configured directory %s: %v", dir, err)
+			}
+
+			continue
+		}
+
 		err := filepath.WalkDir(dir, func(path string, de fs.DirEntry, err error) error { //nolint: revive
 			if err != nil {
-				log.Warnf("Skipping %s: %v", path, err)
+				backerlog.Warnf("Skipping %s: %v", path, err)
 
 				return nil
 			}
 
 			if isExcluded(path) {
-				log.Debugf("Excluding: %s", path)
+				backerlog.Debugf("Excluding: %s", path)
 
 				return nil
 			}
@@ -45,7 +59,7 @@ func GetFilesFromDirectories(directories []string) ([]string, error) {
 		})
 
 		if err != nil {
-			log.Warnf("Failed to walk directory %s: %v", dir, err)
+			backerlog.Warnf("Failed to walk directory %s: %v", dir, err)
 		}
 	}
 

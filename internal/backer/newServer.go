@@ -107,6 +107,7 @@ func NewServer(configPath string) (*ServerWrapper, error) {
 		if err != nil {
 			log.Errorf("Failed to get files: %v", err)
 
+			w.Header().Set("Server", "backer")
 			http.Error(w, "Failed to get files", http.StatusInternalServerError)
 
 			return

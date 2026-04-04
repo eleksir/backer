@@ -93,15 +93,36 @@ func TestGetFilesFromDirectoriesEmptyDir(t *testing.T) {
 }
 
 // TestGetFilesFromDirectoriesNonExistent tests with non-existent directory.
+// Should log error but not fail - returns empty list.
 func TestGetFilesFromDirectoriesNonExistent(t *testing.T) {
 	output, err := GetFilesFromDirectories([]string{"/nonexistent/path/that/does/not/exist"})
 
+	// Should not return error, but logs error
 	if err != nil {
-		t.Errorf("Expected no error (logs warning instead), got %v", err)
+		t.Errorf("Expected no error (logs error instead), got %v", err)
 	}
 
+	// Should return empty list
 	if len(output) != 0 {
 		t.Errorf("Expected empty output for non-existent directory, got %d files", len(output))
+	}
+}
+
+// TestGetFilesFromDirectoriesPartialFailure tests with mix of valid and invalid directories.
+func TestGetFilesFromDirectoriesPartialFailure(t *testing.T) {
+	// Create a temp directory that exists
+	tmpDir := t.TempDir()
+
+	output, err := GetFilesFromDirectories([]string{tmpDir, "/nonexistent/path/that/does/not/exist"})
+
+	// Should not return error, but logs error
+	if err != nil {
+		t.Errorf("Expected no error (logs error instead), got %v", err)
+	}
+
+	// Should return files from valid directory
+	if len(output) == 0 {
+		t.Error("Expected files from valid directory")
 	}
 }
 

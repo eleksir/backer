@@ -11,7 +11,6 @@ depend() {
 }
 
 start_pre() {
-        mkdir -p /var/log/$SVCNAME
         mkdir -p /run/$SVCNAME
 }
 

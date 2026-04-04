@@ -1,6 +1,8 @@
 # Binary
 /backer
 /backer.exe
+/cmd/backer/backer
+/cmd/backer/backer.exe
 
 # Local config (may contain secrets)
 /config.json

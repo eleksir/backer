@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -176,6 +177,73 @@ func TestCreateTarGzStreamSymlink(t *testing.T) {
 
 	if header.Linkname != targetFile {
 		t.Errorf("Expected linkname '%s', got '%s'", targetFile, header.Linkname)
+	}
+}
+
+// TestCreateTarGzStreamHardLink tests hard link handling - should deduplicate content.
+func TestCreateTarGzStreamHardLink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Hard link detection not supported on Windows (inodes unavailable)")
+	}
+
+	tmpDir := t.TempDir()
+
+	// Create original file
+	originalFile := filepath.Join(tmpDir, "original.txt")
+	if err := os.WriteFile(originalFile, []byte("shared content"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create hard link
+	hardLinkFile := filepath.Join(tmpDir, "hardlink.txt")
+	if err := os.Link(originalFile, hardLinkFile); err != nil {
+		t.Skip("Hard links not supported, skipping test")
+	}
+
+	ctx := context.Background()
+	reader := CreateTarGzStream(ctx, []string{originalFile, hardLinkFile})
+	defer reader.Close()
+
+	gzReader, err := gzip.NewReader(reader)
+	if err != nil {
+		t.Fatalf("Failed to create gzip reader: %v", err)
+	}
+	defer gzReader.Close()
+
+	tarReader := tar.NewReader(gzReader)
+
+	entries := 0
+	linkCount := 0
+
+	for {
+		header, err := tarReader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("Failed to read tar entry: %v", err)
+		}
+
+		entries++
+		t.Logf("Entry %d: name=%s typeflag=%c linkname=%s", entries, header.Name, header.Typeflag, header.Linkname)
+
+		if header.Typeflag == tar.TypeLink {
+			linkCount++
+			// Verify it's a link to the original
+			if header.Linkname != originalFile && header.Linkname != filepath.ToSlash(originalFile) {
+				t.Errorf("Expected linkname '%s', got '%s'", originalFile, header.Linkname)
+			}
+		}
+	}
+
+	// Should have 2 entries: one file content, one as hard link
+	if entries != 2 {
+		t.Errorf("Expected 2 entries, got %d", entries)
+	}
+
+	// One should be a hard link (TypeLink)
+	if linkCount != 1 {
+		t.Errorf("Expected 1 hard link entry, got %d", linkCount)
 	}
 }
 

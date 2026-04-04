@@ -124,6 +124,16 @@ CompressionLevel  int `json:"compression_level"`
 | QF1001 | De Morgan's law disabled for auth condition clarity |
 | revive (error strings) | Same reason as ST1005 |
 
+### Design Decisions (Not Issues)
+
+The following are intentional design decisions, not bugs or defects:
+
+- **No rate limiting**: Backups are assumed to be infrequent enough that rate limiting is unnecessary.
+- **Basic Auth only**: HTTP Basic Auth is sufficient for a backup server behind a firewall.
+- **Global config**: The `C Config` global variable is intentional — config is loaded once at startup.
+- **No incremental backup**: Each backup is a full snapshot, not incremental.
+- **Credentials in config file**: Config file should have restricted permissions (documented).
+
 ## Project Structure
 
 ```
@@ -238,6 +248,7 @@ Two helper functions in `newServer.go` handle context cancellation during stream
 - **Device files** (char/block): included with correct major/minor
 - **Named pipes**: included (header only, no data)
 - **Sockets**: skipped (not archivable)
+- **Hard links**: deduplicated — if multiple files share the same inode, only the first is stored with content, subsequent hard links are stored as link entries pointing to the original
 
 ### Pipe Error Recovery
 

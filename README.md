@@ -111,6 +111,17 @@ good enough cypher.
 
 And one more thing user and password are mandatory, we should have at least some minimal barriers, right?
 
+## Supported File Types
+
+Backer handles various file types when creating archives:
+
+- **Regular files**: Included with full content
+- **Directories**: Included as directory entries
+- **Symlinks**: Stored as symlink entries (target path preserved)
+- **Device files**: Character and block devices included with correct major/minor
+- **Named pipes**: Included (header only, no data)
+- **Hard links**: Deduplicated — multiple hard links to the same file are stored as link entries to avoid duplication
+
 ## Logging
 
 Backer logs events via Go's `slog`. Log levels: error, warn, info, debug.

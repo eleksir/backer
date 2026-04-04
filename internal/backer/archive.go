@@ -73,7 +73,14 @@ func createArchiveStream(ctx context.Context, filepaths []string, writerFactory 
 }
 
 // writeFilesToTar iterates over filepaths and writes each file to the tar archive.
+// It tracks inodes to handle hard links - if a file has already been archived,
+// subsequent hard links to the same inode are stored as link entries.
+// This is the Unix implementation (syscall not available on Windows).
 func writeFilesToTar(ctx context.Context, filepaths []string, tw *tar.Writer, closePipeWithError func(error)) {
+	// Track inodes to handle hard links: inode -> first path added.
+	// Uses simple file path tracking on Windows, inode tracking on Unix.
+	seenInodes := make(map[uint64]string)
+
 	for _, fpath := range filepaths {
 		var (
 			err        error
@@ -116,12 +123,32 @@ func writeFilesToTar(ctx context.Context, filepaths []string, tw *tar.Writer, cl
 			continue
 		}
 
+		// Check for hard link - if inode was already seen, store as link instead of content.
+		if st.Mode().IsRegular() {
+			inode := getInode(st)
+			if inode != 0 {
+				if existingPath, seen := seenInodes[inode]; seen {
+					// This is a hard link to already-archived file.
+					linkTarget = existingPath
+					log.Debugf("Hard link detected: %s -> %s", fpath, existingPath)
+				} else {
+					// First time seeing this inode - track it.
+					seenInodes[inode] = fpath
+				}
+			}
+		}
+
 		header, err := tar.FileInfoHeader(st, linkTarget)
 
 		if err != nil {
 			log.Warnf("Skipping %s: tar header failed: %v", fpath, err)
 
 			continue
+		}
+
+		// If linkTarget is set, ensure the header is marked as a link.
+		if linkTarget != "" {
+			header.Typeflag = tar.TypeLink
 		}
 
 		header.Format = tar.FormatGNU
@@ -159,6 +186,27 @@ func writeFilesToTar(ctx context.Context, filepaths []string, tw *tar.Writer, cl
 			}
 		}
 	}
+}
+
+// getInode extracts the inode number from os.FileInfo.
+// Returns 0 if unable to determine (e.g., on Windows or with certain file systems).
+func getInode(fi os.FileInfo) uint64 {
+	if fi.Sys() == nil {
+		return 0
+	}
+
+	// Use type assertion to get inode - works on Unix, returns 0 on Windows.
+	type inodeGetter interface {
+		Dev() uint64
+		Ino() uint64
+	}
+
+	if ig, ok := fi.Sys().(inodeGetter); ok {
+		// Combine device and inode for uniqueness across file systems.
+		return (ig.Dev() << 32) | ig.Ino()
+	}
+
+	return 0
 }
 
 // isPipeClosedError checks if the error is due to a closed pipe.

@@ -22,6 +22,9 @@ var (
 	// This is necessary to allow parallel test execution where each test
 	// may initialize the logger with a different log file.
 	mu sync.RWMutex
+
+	// logLevel stores the configured log level for use by DebugLogger.
+	logLevel slog.Level
 )
 
 // slogWriter implements [io.Writer] to redirect standard log to slog.
@@ -75,6 +78,8 @@ func Init(level, filename string) error {
 	default:
 		loglevel = slog.LevelInfo
 	}
+
+	logLevel = loglevel
 
 	opts := &slog.HandlerOptions{
 		// Use the ReplaceAttr function on the handler options
@@ -149,15 +154,15 @@ func Debugf(format string, a ...any) {
 	slog.Debug(fmt.Sprintf(format, a...))
 }
 
-// DebugLogger returns a standard library logger that writes to debug level.
-// This is useful for assigning to http.Server.ErrorLog to move TLS handshake
-// and other client-side errors to debug level.
+// DebugLogger returns a standard library logger that writes at the configured log level.
+// This is useful for assigning to http.Server.ErrorLog to route net/http errors
+// through our logger while respecting the configured log level.
 func DebugLogger() *log.Logger {
 	mu.RLock()
 	defer mu.RUnlock()
 
 	opts := &slog.HandlerOptions{
-		Level: slog.LevelDebug,
+		Level: logLevel,
 	}
 
 	handler := slog.NewTextHandler(Log, opts)

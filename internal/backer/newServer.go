@@ -111,6 +111,10 @@ func NewServer(configPath string) (*ServerWrapper, error) {
 			return
 		}
 
+		if len(files) == 0 {
+			log.Warnf("No files found to backup in configured directories")
+		}
+
 		var (
 			archive   io.ReadCloser
 			extension string

@@ -46,8 +46,8 @@ func NewServer(configPath string) (*http.Server, error) {
 			return
 		}
 
-		// Both username AND password must match. Fuck De Morgan and his bullshit laws - we explicitly require
-		// that the whole condition fails. That *is* the point.
+		// Both username AND password must match. Explicitly require that the whole condition
+		// fails when either is incorrect, per the authentication design.
 		//nolint:staticcheck // QF1001: De Morgan's law is irrelevant here.
 		if !(username == C.User && password == C.Password) {
 			w.Header().Set("WWW-Authenticate", `Basic realm="restricted", charset="UTF-8"`)
@@ -128,19 +128,8 @@ func NewServer(configPath string) (*http.Server, error) {
 		log.Infof("Backup completed: client=%s user=%s files=%d bytes=%d duration=%s", clientIP, username, len(files), bytesWritten, duration)
 	})
 
-	// Decision about which mode (http or https) to run made in cmd/backer/main.go, where we run server.ListenAndServe()
-	// or server.ListenAndServeTLS() depending on value of C.NoHTTPS.
-	if C.NoHTTPS {
-		return &http.Server{
-			Addr:              fmt.Sprintf("%s:%d", C.Address, C.Port),
-			Handler:           withServerHeader(mux),
-			ReadHeaderTimeout: readHeaderTimeout,
-			WriteTimeout:      time.Duration(C.BackupTimeout) * time.Minute,
-		}, nil
-	}
-
-	// Decision about which mode (http or https) to run made in cmd/backer/main.go, where we run server.ListenAndServe()
-	// or server.ListenAndServeTLS() depending on value of C.NoHTTPS.
+	// HTTP mode if nohttps is enabled in config.
+	// HTTPS mode if nohttps is disabled in config.
 	if C.NoHTTPS {
 		return &http.Server{
 			Addr:              fmt.Sprintf("%s:%d", C.Address, C.Port),
@@ -153,7 +142,7 @@ func NewServer(configPath string) (*http.Server, error) {
 	return &http.Server{
 		Addr:              fmt.Sprintf("%s:%d", C.Address, C.Port),
 		Handler:           withServerHeader(mux),
-		ReadHeaderTimeout: 5 * time.Second,
+		ReadHeaderTimeout: readHeaderTimeout,
 		WriteTimeout:      time.Duration(C.BackupTimeout) * time.Minute,
 		TLSConfig: &tls.Config{
 			MinVersion: tls.VersionTLS13,

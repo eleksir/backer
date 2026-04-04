@@ -111,6 +111,19 @@ good enough cypher.
 
 And one more thing user and password are mandatory, we should have at least some minimal barriers, right?
 
+## Logging
+
+Backer logs events via Go's `slog`. Log levels: error, warn, info, debug.
+
+### TLS Error Handling
+
+TLS handshake errors and other client-side SSL/TLS errors are logged at **debug** level to reduce log clutter.
+This includes:
+- Certificate verification failures
+- Handshake failures
+- Protocol errors
+- TLS-specific connection issues
+
 ## Special Thanks
 
 This project was developed with the assistance of **opencode** (AI co-programmer powered by MIMO). The AI helped with:

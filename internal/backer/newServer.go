@@ -3,6 +3,7 @@ package backer
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -14,6 +15,36 @@ import (
 	"backer/internal/log"
 )
 
+// isTLSError checks if the given error is TLS-related.
+// It checks for both TLS-specific error types and error messages containing "tls:".
+func isTLSError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	var alertErr *tls.AlertError
+	if errors.As(err, &alertErr) && alertErr != nil {
+		return true
+	}
+
+	var certErr *tls.CertificateVerificationError
+	if errors.As(err, &certErr) && certErr != nil {
+		return true
+	}
+
+	var echErr *tls.ECHRejectionError
+	if errors.As(err, &echErr) && echErr != nil {
+		return true
+	}
+
+	var recordErr *tls.RecordHeaderError
+	if errors.As(err, &recordErr) && recordErr != nil {
+		return true
+	}
+
+	return strings.HasPrefix(err.Error(), "tls:")
+}
+
 // withServerHeader wraps a handler to add Server header to all responses.
 func withServerHeader(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -23,7 +54,8 @@ func withServerHeader(next http.Handler) http.Handler {
 }
 
 // NewServer starts new server instance with given config file.
-func NewServer(configPath string) (*http.Server, error) {
+// It returns a serverWrapper that intercepts and classifies server errors.
+func NewServer(configPath string) (*serverWrapper, error) { //nolint: revive
 	_ = log.Init("info", "") // Initialize logger with defaults for early logging.
 
 	if err := LoadConfig(configPath); err != nil {
@@ -139,21 +171,27 @@ func NewServer(configPath string) (*http.Server, error) {
 	// HTTP mode if nohttps is enabled in config.
 	// HTTPS mode if nohttps is disabled in config.
 	if C.NoHTTPS {
-		return &http.Server{
+		return &serverWrapper{
+			Server: &http.Server{
+				Addr:              fmt.Sprintf("%s:%d", C.Address, C.Port),
+				Handler:           withServerHeader(mux),
+				ReadHeaderTimeout: readHeaderTimeout,
+				WriteTimeout:      time.Duration(C.BackupTimeout) * time.Minute,
+				ErrorLog:          log.DebugLogger(),
+			},
+		}, nil
+	}
+
+	return &serverWrapper{
+		Server: &http.Server{
 			Addr:              fmt.Sprintf("%s:%d", C.Address, C.Port),
 			Handler:           withServerHeader(mux),
 			ReadHeaderTimeout: readHeaderTimeout,
 			WriteTimeout:      time.Duration(C.BackupTimeout) * time.Minute,
-		}, nil
-	}
-
-	return &http.Server{
-		Addr:              fmt.Sprintf("%s:%d", C.Address, C.Port),
-		Handler:           withServerHeader(mux),
-		ReadHeaderTimeout: readHeaderTimeout,
-		WriteTimeout:      time.Duration(C.BackupTimeout) * time.Minute,
-		TLSConfig: &tls.Config{
-			MinVersion: tls.VersionTLS13,
+			TLSConfig: &tls.Config{
+				MinVersion: tls.VersionTLS13,
+			},
+			ErrorLog: log.DebugLogger(),
 		},
 	}, nil
 }
@@ -233,6 +271,44 @@ func getCompressionAlgorithm(requestedExt string) string {
 	default:
 		return C.DefaultCompression
 	}
+}
+
+// serverWrapper wraps http.Server to intercept and classify errors.
+type (
+	serverWrapper struct {
+		*http.Server
+	}
+)
+
+// Serve starts the server and classifies any errors returned.
+// TLS-related errors are logged at debug level, other errors at warn level.
+func (sw *serverWrapper) Serve() error {
+	err := sw.ListenAndServe()
+
+	if err != nil {
+		if isTLSError(err) {
+			log.Debugf("Server error: %v", err)
+		} else {
+			log.Warnf("Server error: %v", err)
+		}
+	}
+
+	return err
+}
+
+// ServeTLS starts the TLS server and classifies any errors returned.
+func (sw *serverWrapper) ServeTLS(certFile, keyFile string) error {
+	err := sw.ListenAndServeTLS(certFile, keyFile)
+
+	if err != nil {
+		if isTLSError(err) {
+			log.Debugf("Server TLS error: %v", err)
+		} else {
+			log.Warnf("Server TLS error: %v", err)
+		}
+	}
+
+	return err
 }
 
 /* vim: setlocal ft=go noet ai ts=4 sw=4 sts=4: */

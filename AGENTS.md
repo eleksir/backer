@@ -257,6 +257,16 @@ Checks `X-Forwarded-For` header first (for proxied requests), then falls back to
 - `WriteTimeout`: configurable via `backup_timeout` (converted to `time.Duration`)
 - TLS minimum version: TLS 1.3 (when HTTPS enabled)
 
+### TLS Error Handling
+
+The server uses a `serverWrapper` type to intercept and classify errors from `Serve()` and `ServeTLS()`. TLS-specific errors are logged at debug level to reduce log clutter:
+
+- Uses `errors.As` to detect TLS error types: `tls.AlertError`, `tls.CertificateVerificationError`, `tls.ECHRejectionError`, `tls.RecordHeaderError`
+- Also checks for "tls:" prefix in error messages
+- Additionally uses `http.Server.ErrorLog` with a custom logger that writes at debug level for net/http's internal TLS-related messages
+
+This ensures client-side TLS errors (handshake failures, certificate issues) don't clutter production logs.
+
 ## Dependencies
 
 - `github.com/hjson/hjson-go` v3.3.0 — HJSON config parsing

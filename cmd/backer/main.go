@@ -2,6 +2,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"net/http"
@@ -43,7 +44,7 @@ func main() {
 	log.Infof("Starting backer version %s at %s", version, server.Addr)
 
 	if backer.C.NoHTTPS {
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := server.Serve(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("Failed to start server: %v", err)
 		}
 	} else {
@@ -55,7 +56,7 @@ func main() {
 			log.Fatalf("Certificate key file error: %v", err)
 		}
 
-		if err := server.ListenAndServeTLS(backer.C.Cert, backer.C.Key); err != nil && err != http.ErrServerClosed {
+		if err := server.ServeTLS(backer.C.Cert, backer.C.Key); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("Failed to start server: %v", err)
 		}
 	}

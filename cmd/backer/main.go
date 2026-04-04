@@ -41,6 +41,10 @@ func main() {
 		log.Fatalf("Failed to create server: %v", err)
 	}
 
+	// Setup signal handling for immediate shutdown.
+	log.Infof("Installing signal handler")
+	setupSignalHandler(server)
+
 	log.Infof("Starting backer version %s at %s", version, server.Addr)
 
 	if backer.C.NoHTTPS {
@@ -60,6 +64,8 @@ func main() {
 			log.Fatalf("Failed to start server: %v", err)
 		}
 	}
+
+	log.Infof("Server stopped")
 }
 
 // defaultConfigPath returns the default config file path based on the OS.

@@ -135,6 +135,15 @@ This includes:
 - Protocol errors
 - TLS-specific connection issues
 
+### Graceful Shutdown
+
+When backer receives a termination signal (SIGTERM or SIGINT), it will:
+1. Log a warning message: "Shutdown signal received, shutting down immediately..."
+2. Stop accepting new connections and abort any in-progress downloads immediately
+3. Clean up resources and exit
+
+This ensures no partial/corrupted backups are left. Clients will need to restart their backup. For a forced immediate stop, use `SIGKILL`.
+
 ## Special Thanks
 
 This project was developed with the assistance of **opencode** (AI co-programmer powered by MIMO). The AI helped with:

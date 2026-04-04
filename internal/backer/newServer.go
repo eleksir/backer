@@ -54,8 +54,8 @@ func withServerHeader(next http.Handler) http.Handler {
 }
 
 // NewServer starts new server instance with given config file.
-// It returns a serverWrapper that intercepts and classifies server errors.
-func NewServer(configPath string) (*serverWrapper, error) { //nolint: revive
+// It returns a ServerWrapper that intercepts and classifies server errors.
+func NewServer(configPath string) (*ServerWrapper, error) {
 	_ = log.Init("info", "") // Initialize logger with defaults for early logging.
 
 	if err := LoadConfig(configPath); err != nil {
@@ -175,7 +175,7 @@ func NewServer(configPath string) (*serverWrapper, error) { //nolint: revive
 	// HTTP mode if nohttps is enabled in config.
 	// HTTPS mode if nohttps is disabled in config.
 	if C.NoHTTPS {
-		return &serverWrapper{
+		return &ServerWrapper{
 			Server: &http.Server{
 				Addr:              fmt.Sprintf("%s:%d", C.Address, C.Port),
 				Handler:           withServerHeader(mux),
@@ -186,7 +186,7 @@ func NewServer(configPath string) (*serverWrapper, error) { //nolint: revive
 		}, nil
 	}
 
-	return &serverWrapper{
+	return &ServerWrapper{
 		Server: &http.Server{
 			Addr:              fmt.Sprintf("%s:%d", C.Address, C.Port),
 			Handler:           withServerHeader(mux),
@@ -284,15 +284,15 @@ func getCompressionAlgorithm(requestedExt string) string {
 }
 
 type (
-	// serverWrapper wraps [http.Server] to intercept and classify errors.
-	serverWrapper struct {
+	// ServerWrapper wraps [http.Server] to intercept and classify errors.
+	ServerWrapper struct {
 		*http.Server
 	}
 )
 
 // Serve starts the server and classifies any errors returned.
 // TLS-related errors are logged at debug level, other errors at warn level.
-func (sw *serverWrapper) Serve() error {
+func (sw *ServerWrapper) Serve() error {
 	err := sw.ListenAndServe()
 
 	if err != nil {
@@ -307,7 +307,7 @@ func (sw *serverWrapper) Serve() error {
 }
 
 // ServeTLS starts the TLS server and classifies any errors returned.
-func (sw *serverWrapper) ServeTLS(certFile, keyFile string) error {
+func (sw *ServerWrapper) ServeTLS(certFile, keyFile string) error {
 	err := sw.ListenAndServeTLS(certFile, keyFile)
 
 	if err != nil {

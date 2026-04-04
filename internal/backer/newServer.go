@@ -184,6 +184,7 @@ func NewServer(configPath string) (*ServerWrapper, error) {
 				Handler:           withServerHeader(mux),
 				ReadHeaderTimeout: readHeaderTimeout,
 				WriteTimeout:      time.Duration(C.BackupTimeout) * time.Minute,
+				MaxHeaderBytes:    maxHeaderBytes,
 				ErrorLog:          log.DebugLogger(),
 			},
 		}, nil
@@ -195,6 +196,7 @@ func NewServer(configPath string) (*ServerWrapper, error) {
 			Handler:           withServerHeader(mux),
 			ReadHeaderTimeout: readHeaderTimeout,
 			WriteTimeout:      time.Duration(C.BackupTimeout) * time.Minute,
+			MaxHeaderBytes:    maxHeaderBytes,
 			TLSConfig: &tls.Config{
 				MinVersion: tls.VersionTLS13,
 			},

@@ -11,6 +11,9 @@ const (
 	// copyBufferSize is the buffer size used for streaming file contents.
 	copyBufferSize = 32 * 1024
 
+	// maxHeaderBytes is the maximum size of request headers (1KB).
+	maxHeaderBytes = 1024
+
 	// portMin is the minimum valid port number.
 	portMin = 1
 

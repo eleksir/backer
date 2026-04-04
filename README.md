@@ -75,14 +75,14 @@ All options described in example config.
 
 AI suggests this table as expected performance.
 
-| Algorithm | Speed | Compression | Notes |
-| :--- | :--- | :--- | :--- |
-| gzip | Fast | Good | Default. Standard, widely compatible. |
-| pgzip | Fast | Good | Parallel gzip. Uses multiple CPU cores, slightly larger files. |
-| bzip2 | Slow | Better | Pure Go. Good compression, slower than gzip. |
-| zstd | Fast | Very good | Good balance of speed and compression. |
-| lz4 | Fastest | Moderate | Extremely fast, larger files. |
-| xz | Slowest | Best | Best compression, slowest speed. |
+| Algorithm | Speed   | Compression | Notes |
+| :---      | :---    | :---        | :--- |
+| gzip      | Fast    | Good        | Standard, widely compatible. |
+| pgzip     | Fast    | Good        | Parallel gzip. Uses multiple CPU cores, slightly larger files. |
+| bzip2     | Slow    | Better      | Pure Go. Good compression, slower than gzip. |
+| zstd      | Fast    | Very good   | Good balance of speed and compression. |
+| lz4       | Fastest | Moderate    | Extremely fast, larger files. |
+| xz        | Slowest | Best        | Best compression, slowest speed. |
 
 In real live with backup of 1 lxc container inside vm powered by 1 core cpu, 768Mb RAM and 100Mbit non-guaranteed
 network bandwidth, located in near by country I've got these results
@@ -90,12 +90,21 @@ network bandwidth, located in near by country I've got these results
 | Algorithm | Size       | Time    | CPU Load | RAM RSS+Shm, Mb | Notes |
 | :---      | ---:       | ---:    | ---:     | ---:            | :---  |
 | None      | 1461250551 |         |     0-2% |             0+0 | original dataset |
+| gzip      |  823381547 | 16m:22s |      96% |            18+6 | stdlib compression/gzip |
+| pgzip     |  823783924 | 13m:50s |   93-97% |            28+5 | multithreaded (parallel gzip), fully gzip compatible, klauspost/pgzip |
+| bzip2     |  797053471 |  9m:47s |   92-94% |            56+6 | dsnet/compress/bzip2 |
+| xz        |  515106988 | 16m:03s |      96% |           116+5 | ulikunitz/xz |
+| zstd      |  617330529 |  6m:39s |   40-99% |            64+6 | klauspost/compress/zstd |
 | lz4       | 1097745915 |  6m:12s |     4-6% |            30+6 | multithreaded lz4, pierrec/lz4 |
-| zstd      |  614015773 |  4m:52s |   40-60% |            60+6 | klauspost/compress/zstd |
-| pgzip     |  817163857 | 11m:25s |   96-97% |            37+6 | multithreaded (parallel gzip), fully gzip compatible, klauspost/pgzip |
-| gzip      |  816734188 | 14m:30s |      96% |            18+6 | stdlib compression/gzip |
-| bzip2     |  788061284 |  7m:16s |   92-94% |            43+6 | dsnet/compress/bzip2 |
-| xz        |  512004612 | 13m:53s |      96% |           116+6 | ulikunitz/xz |
+
+The `compression_level` option (1-9) maps differently for each algorithm:
+
+| Algorithm        | Level Mapping |
+| :---             | :---          |
+| gzip/pgzip/bzip2 | 1-9 directly maps to compression levels |
+| lz4              | 1-3 → Fastest (0), 4-6 → Default (1), 7-9 → Best (2) |
+| zstd             | 1-3 → Fastest, 4-6 → Default, 7-9 → BetterCompression |
+| xz               | Uses default compression (no configurable level) |
 
 Obvously in case of lz4 and zstd the bottleneck was network. And I have to admit, that network definitely was not
 100Mbit, but it was pretty hard to measure real bandwidth. Anyway let's pretend that during experiment it was roughly
@@ -125,7 +134,20 @@ Backer handles various file types when creating archives:
 ## Logging
 
 Backer logs events via Go's `slog`. Log levels: error, warn, info, debug.
+### Backup Completion Log
 
+When a backup completes, the following information is logged:
+- **client**: Client IP address
+- **user**: Authenticated username
+- **files**: Number of files backed up
+- **bytes**: Size of the created archive in bytes
+- **md5**: MD5 hash of the created archive (for verification)
+- **duration**: Time taken to create the archive
+
+Example:
+```
+Backup completed: client=127.0.0.1 user=admin files=42 bytes=1234567 md5=abc123def456 duration=2.5s
+```
 ### TLS Error Handling
 
 TLS handshake errors and other client-side SSL/TLS errors are logged at **debug** level to reduce log clutter.

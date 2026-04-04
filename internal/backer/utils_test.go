@@ -424,4 +424,144 @@ func TestCreateTarGzStreamDeviceFile(t *testing.T) {
 	}
 }
 
+// TestCompressionLevelMappingLz4 tests that lz4 compression levels are correctly mapped.
+func TestCompressionLevelMappingLz4(t *testing.T) {
+	tests := []struct {
+		input    int
+		expected int
+	}{
+		{1, 0},
+		{2, 0},
+		{3, 0},
+		{4, 1},
+		{5, 1},
+		{6, 1},
+		{7, 2},
+		{8, 2},
+		{9, 2},
+	}
+
+	for _, tt := range tests {
+		C = Config{CompressionLevel: tt.input}
+		result := mapCompressionLevelToLz4(tt.input)
+		if result != tt.expected {
+			t.Errorf("mapCompressionLevelToLz4(%d) = %d, expected %d", tt.input, result, tt.expected)
+		}
+	}
+}
+
+// TestCompressionLevelMappingXz tests that xz compression is not configurable via level.
+// xz uses default compression - this test verifies the stream works.
+func TestCompressionLevelMappingXz(t *testing.T) {
+	// xz doesn't support configurable compression levels in the same way.
+	// It always uses default compression. This test verifies the stream is created successfully.
+	C = Config{CompressionLevel: 6}
+
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.txt")
+	content := []byte("test content")
+	if err := os.WriteFile(testFile, content, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := context.Background()
+	reader := CreateTarXzStream(ctx, []string{testFile})
+	defer reader.Close()
+
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("Failed to read xz archive: %v", err)
+	}
+
+	if len(data) == 0 {
+		t.Error("Expected non-empty archive")
+	}
+}
+
+// TestCompressionLevelMappingBzip2 tests that bzip2 compression levels are correctly mapped.
+func TestCompressionLevelMappingBzip2(t *testing.T) {
+	tests := []struct {
+		input    int
+		expected int
+	}{
+		{1, 1},
+		{5, 5},
+		{9, 9},
+	}
+
+	for _, tt := range tests {
+		C = Config{CompressionLevel: tt.input}
+		result := mapCompressionLevelToBzip2(tt.input)
+		if result != tt.expected {
+			t.Errorf("mapCompressionLevelToBzip2(%d) = %d, expected %d", tt.input, result, tt.expected)
+		}
+	}
+}
+
+// TestCreateTarBzip2Stream tests bzip2 compression with configured level.
+func TestCreateTarBzip2Stream(t *testing.T) {
+	C = Config{CompressionLevel: 6}
+
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.txt")
+	content := []byte("test content for bzip2")
+	if err := os.WriteFile(testFile, content, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := context.Background()
+	reader := CreateTarBzip2Stream(ctx, []string{testFile})
+	defer reader.Close()
+
+	// Verify we can read the archive
+	_, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("Failed to read bzip2 archive: %v", err)
+	}
+}
+
+// TestCreateTarLz4Stream tests lz4 compression with configured level.
+func TestCreateTarLz4Stream(t *testing.T) {
+	C = Config{CompressionLevel: 6}
+
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.txt")
+	content := []byte("test content for lz4")
+	if err := os.WriteFile(testFile, content, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := context.Background()
+	reader := CreateTarLz4Stream(ctx, []string{testFile})
+	defer reader.Close()
+
+	// Verify we can read the archive
+	_, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("Failed to read lz4 archive: %v", err)
+	}
+}
+
+// TestCreateTarXzStream tests xz compression with configured level.
+func TestCreateTarXzStream(t *testing.T) {
+	C = Config{CompressionLevel: 6}
+
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.txt")
+	content := []byte("test content for xz")
+	if err := os.WriteFile(testFile, content, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := context.Background()
+	reader := CreateTarXzStream(ctx, []string{testFile})
+	defer reader.Close()
+
+	// Verify we can read the archive
+	_, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("Failed to read xz archive: %v", err)
+	}
+}
+
 /* vim: setlocal ft=go noet ai ts=4 sw=4 sts=4: */

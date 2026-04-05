@@ -48,6 +48,23 @@ func isTLSError(err error) bool {
 	return strings.HasPrefix(err.Error(), "tls:")
 }
 
+// withStatusLogging wraps a handler to log 404 and 405 responses.
+func withStatusLogging(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rw := &responseWriterWrapper{ResponseWriter: w, statusCode: http.StatusOK}
+		next.ServeHTTP(rw, r)
+
+		clientIP := getClientIP(r)
+
+		switch rw.statusCode {
+		case http.StatusNotFound:
+			log.Infof("Not Found from %s to %s", clientIP, r.RequestURI)
+		case http.StatusMethodNotAllowed:
+			log.Infof("Method Not Allowed from %s for %s %s", clientIP, r.Method, r.RequestURI)
+		}
+	})
+}
+
 // withServerHeader wraps a handler to add Server header to all responses.
 func withServerHeader(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -74,6 +91,13 @@ func NewServer(configPath string) (*ServerWrapper, error) {
 	mux := http.NewServeMux()
 
 	backupHandler := func(w http.ResponseWriter, r *http.Request) {
+		// Only GET method is allowed.
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+
+			return
+		}
+
 		username, password, ok := r.BasicAuth()
 
 		// No auth? Good bye.
@@ -219,7 +243,7 @@ func NewServer(configPath string) (*ServerWrapper, error) {
 		srv := &ServerWrapper{
 			Server: &http.Server{
 				Addr:              fmt.Sprintf("%s:%d", C.Address, C.Port),
-				Handler:           withServerHeader(mux),
+				Handler:           withServerHeader(withStatusLogging(mux)),
 				ReadHeaderTimeout: readHeaderTimeout,
 				WriteTimeout:      time.Duration(C.BackupTimeout) * time.Minute,
 				IdleTimeout:       idleTimeout,
@@ -235,7 +259,7 @@ func NewServer(configPath string) (*ServerWrapper, error) {
 	srv := &ServerWrapper{
 		Server: &http.Server{
 			Addr:              fmt.Sprintf("%s:%d", C.Address, C.Port),
-			Handler:           withServerHeader(mux),
+			Handler:           withServerHeader(withStatusLogging(mux)),
 			ReadHeaderTimeout: readHeaderTimeout,
 			WriteTimeout:      time.Duration(C.BackupTimeout) * time.Minute,
 			IdleTimeout:       idleTimeout,
@@ -374,7 +398,19 @@ type (
 	ServerWrapper struct {
 		*http.Server
 	}
+
+	// responseWriterWrapper wraps http.ResponseWriter to capture status code.
+	responseWriterWrapper struct {
+		http.ResponseWriter
+		statusCode int
+	}
 )
+
+// WriteHeader captures the status code for logging.
+func (rw *responseWriterWrapper) WriteHeader(code int) {
+	rw.statusCode = code
+	rw.ResponseWriter.WriteHeader(code)
+}
 
 // Serve starts the server and classifies any errors returned.
 // TLS-related errors are logged at debug level, other errors at warn level.

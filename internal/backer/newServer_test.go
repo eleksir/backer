@@ -523,4 +523,99 @@ func TestCopyWithContextCancellation(t *testing.T) {
 	}
 }
 
+// TestStatusLogging404 tests that 404 responses are logged.
+func TestStatusLogging404(t *testing.T) {
+	C = Config{} // Reset global config.
+	excludePatterns = nil
+
+	// Create a minimal mux that returns 404 for all paths
+	testMux := http.NewServeMux()
+	testMux.HandleFunc("/archive", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	wrappedMux := withStatusLogging(testMux)
+
+	// Use a ResponseRecorder to capture the response
+	rr := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/nonexistent", nil)
+	req.RemoteAddr = "127.0.0.1:12345"
+
+	wrappedMux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("Expected status 404, got %d", rr.Code)
+	}
+}
+
+// TestStatusLogging405 tests that 405 responses are logged.
+func TestStatusLogging405(t *testing.T) {
+	C = Config{} // Reset global config.
+	excludePatterns = nil
+
+	// Create a minimal mux that returns 405 for wrong method
+	testMux := http.NewServeMux()
+	testMux.HandleFunc("/archive", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	})
+
+	wrappedMux := withStatusLogging(testMux)
+
+	rr := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/archive", nil)
+	req.RemoteAddr = "127.0.0.1:12345"
+
+	wrappedMux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusMethodNotAllowed {
+		t.Errorf("Expected status 405, got %d", rr.Code)
+	}
+}
+
+// TestMethodNotAllowedHandler tests that non-GET methods return 405.
+func TestMethodNotAllowedHandler(t *testing.T) {
+	C = Config{
+		Address:     "0.0.0.0",
+		Port:        8086,
+		Location:    "/archive",
+		User:        "testuser",
+		Password:    "testpass",
+		Directories: []string{"../../test_data/test1/foo"},
+	}
+	excludePatterns = nil
+
+	// Create test server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		username, password, ok := r.BasicAuth()
+		if !ok || username != C.User || password != C.Password {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+
+			return
+		}
+
+		if r.Method != http.MethodGet {
+			w.Header().Set("Server", "backer")
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	// Test POST method
+	req, _ := http.NewRequest("POST", server.URL+"/archive", nil)
+	req.SetBasicAuth("testuser", "testpass")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusMethodNotAllowed {
+		t.Errorf("Expected status 405, got %d", resp.StatusCode)
+	}
+}
+
 /* vim: setlocal ft=go noet ai ts=4 sw=4 sts=4: */

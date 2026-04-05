@@ -30,13 +30,13 @@ curl -u user:pass https://server:8086/archive -o backup.tar.gz
 │   │   ├── globals.go       # Global C Config variable
 │   │   ├── archive.go       # Common archive logic (createArchiveStream, writeFilesToTar)
 │   │   ├── gzip.go          # CreateTarGzStream, CreateTarPgzipStream
-│   │   ├── bzip2.go         # CreateTarBzip2Stream
-│   │   ├── zstd.go          # CreateTarZstdStream
-│   │   ├── lz4.go           # CreateTarLz4Stream
+│   │   ├── bzip2.go         # CreateTarBzip2Stream, mapCompressionLevelToBzip2
+│   │   ├── zstd.go          # CreateTarZstdStream, zstdLevel
+│   │   ├── lz4.go           # CreateTarLz4Stream, mapCompressionLevelToLz4
 │   │   ├── xz.go            # CreateTarXzStream
 │   │   ├── loadConfig.go    # HJSON/JSON config parsing with validation
 │   │   ├── newServer.go     # HTTP server, auth handler, context helpers
-│   │   ├── getFilesFromDirectories.go  # Directory walking, exclusion filtering
+│   │   ├── getFilesFromDirectories.go  # Directory walking, exclusion filtering, isExcluded
 │   │   └── *_test.go        # Test files
 │   └── log/main.go          # Logging wrapper around stdlib slog
 ├── contrib/                 # Init scripts
@@ -55,7 +55,7 @@ curl -u user:pass https://server:8086/archive -o backup.tar.gz
 |--------|---------|-------------|
 | address | 0.0.0.0 | Listen address |
 | port | 8086 | Listen port |
-| cert/key | - | TLS cert/key paths |
+| cert/key | - | TLS cert/key paths (required when nohttps=false) |
 | nohttps | false | Disable HTTPS |
 | location | /archive | API endpoint path |
 | user | - | Basic auth username (required) |
@@ -64,10 +64,23 @@ curl -u user:pass https://server:8086/archive -o backup.tar.gz
 | loglevel | info | Log verbosity (debug/info/warn/error) |
 | directories | - | Directories to backup (required) |
 | backup_timeout | 60 | Stream timeout in minutes (1-1440) |
-| compression_level | 9 | Gzip level (1-9) |
+| dir_scan_timeout | 60 | Directory scan timeout in minutes (1-1440) |
+| compression_level | 9 | Compression level (1-9) |
 | exclude_patterns | [] | Regex patterns to exclude from backup |
 | filename_prefix | backup | Prefix for backup filename in Content-Disposition header |
-| compression_algorithm | gzip | Compression algorithm (gzip, pgzip, bzip2, zstd, lz4 or xz) |
+| default_compression | gzip | Default compression algorithm (gzip, pgzip, bzip2, zstd, lz4, xz) |
+| compression_algorithm | gzip | Alias for default_compression (deprecated) |
+
+## Compression Level Mapping
+
+The `compression_level` config option (1-9) is mapped differently for each algorithm:
+
+| Algorithm | Level Mapping |
+|-----------|---------------|
+| gzip/pgzip/bzip2 | 1-9 directly maps to compression levels |
+| lz4 | 1-3 → Fastest (0), 4-6 → Default (1), 7-9 → Best (2) |
+| zstd | 1-3 → Fastest, 4-6 → Default, 7-9 → BetterCompression |
+| xz | Uses default compression (no configurable level) |
 
 ## Key Patterns
 
@@ -85,16 +98,36 @@ json.Marshal(tmp)
 json.Unmarshal(buf, &C)
 ```
 
-### Stream Cancellation
-Context-aware write and copy functions:
+### Context-Aware I/O
+Two helper functions in newServer.go handle context cancellation during streaming:
+- `writeWithContext(ctx, fn)` — checks context before calling fn
+- `copyWithContext(ctx, dst, src)` — buffered copy (32KB) with cancellation checks, computes MD5 hash
+
 ```go
 func writeWithContext(ctx context.Context, fn func() error) error
-func copyWithContext(ctx context.Context, dst io.Writer, src io.Reader) error
+func copyWithContext(ctx context.Context, dst io.Writer, src io.Reader) (int64, string, error)
 ```
+
+### HTTP Server Middleware
+Two middleware functions wrap the handler:
+- `withServerHeader` — adds "Server: backer" header to all responses
+- `withStatusLogging` — logs 404 and 405 responses
+
+```go
+Handler: withServerHeader(withStatusLogging(mux))
+```
+
+### Unmatched Route Logging
+The server wraps http.ResponseWriter to capture status codes:
+- **404 Not Found**: `"Not Found from {clientIP} to {path}"`
+- **405 Method Not Allowed**: `"Method Not Allowed from {clientIP} for {method} {path}"`
+
+Uses `responseWriterWrapper` that tracks status code via WriteHeader() method.
 
 ### Pipe Error Handling
 Uses `pipeErr` tracking to avoid noisy errors when reader closes early.
 Skips files that can't be read (logs warning, continues backup).
+- `isPipeClosedError()` checks for "io: read/write on closed pipe" errors
 
 ### Content-Disposition Filename
 Backup filenames include timestamp and configured prefix: `backup-20060102-150405.tar.gz` (extension depends on compression_algorithm).
@@ -102,18 +135,43 @@ Backup filenames include timestamp and configured prefix: `backup-20060102-15040
 ### Special File Types
 - **Device files** (character/block) are included with correct major/minor numbers.
 - **Sockets** are skipped (no entry created).
-- **Symlinks** are stored as symlinks (target path stored).
+- **Symlinks** are stored as symlinks (target path stored) - uses os.Lstat, no cycles possible.
 - **Named pipes** and other special files are included (tar header created).
+- **Hard links** are deduplicated - first occurrence stored with content, subsequent as link entries.
 - **Regular files** are compressed; other file types have no data section.
 
 ### Error Recovery
 - `writeWithContext` checks context before calling fn.
 - `copyWithContext` does buffered copy with cancellation checks.
 
+### Client IP Detection
+Checks `X-Forwarded-For` header first (for proxied requests), then falls back to `RemoteAddr`.
+
+### TLS Error Handling
+Uses `ServerWrapper` to intercept and classify errors from Serve() and ServeTLS():
+- TLS-specific errors logged at debug level to reduce log clutter
+- Uses errors.As to detect: tls.AlertError, tls.CertificateVerificationError, tls.ECHRejectionError, tls.RecordHeaderError
+
+### HTTP Routing & Compression Selection
+The server uses http.NewServeMux() for routing. Multiple routes support different compression formats:
+```go
+mux.Handle(C.Location, http.HandlerFunc(backupHandler))           // /archive
+mux.Handle(C.Location+".tar.gz", http.HandlerFunc(backupHandler))  // archive.tar.gz
+mux.Handle(C.Location+".tar.xz", http.HandlerFunc(backupHandler))   // archive.tar.xz
+mux.Handle(C.Location+".tar.bz2", http.HandlerFunc(backupHandler)) // archive.tar.bz2
+// ... etc (.tar.lz4, .tar.zst, .tar.zstd)
+```
+
+Compression algorithm determined by path extension using `path.Ext()`:
+- Full path: `/archive.tar.xz` → `.xz` → xz
+- Bare extension: `tar.xz` → `.xz` → xz
+- Default when no extension matches
+
 ### Performance Notes
 - Exclude patterns are precompiled after config load for faster matching.
 - Compression level is configurable (1-9); default 9 uses more CPU.
 - Large directory walks use `filepath.WalkDir` (efficient).
+- Context cancellation checked on each file during directory scan.
 
 ## Coding Style & Conventions
 
@@ -128,7 +186,8 @@ GetFilesFromDirectories()
 // Unexported (private): verbNoun or isNoun pattern
 writeWithContext()
 copyWithContext()
-isPipeClosedError()  // predicate helper
+isPipeClosedError()
+isExcluded()
 defaultConfigPath()
 ```
 
@@ -137,6 +196,7 @@ Struct fields use PascalCase, json tags use snake_case:
 ```go
 BackupTimeout     int `json:"backup_timeout"`
 CompressionLevel  int `json:"compression_level"`
+DirScanTimeout    int `json:"dir_scan_timeout"`
 ```
 
 ### Error Messages
@@ -149,6 +209,7 @@ CompressionLevel  int `json:"compression_level"`
 - Past tense: `"Failed to close gzip writer: %v", err`
 - Context included: `"Skipping %s: %v", filename, err`
 - Appropriate level: Warn for recoverable, Error for issues, Fatal for startup failures
+- Log levels: error, warn, info, debug
 
 ### Config Validation Pattern
 For each config option: set default first, then immediately validate:
@@ -166,7 +227,7 @@ if C.Port < 1 || C.Port > 65535 {
 
 ### Go Formatting
 - Tabs for indentation
-- Vim modeline at EOF: `/* vim: setlocal ft=go noet ai ts=4 sw=4 sts=4: */`
+- Vim modeline at EOF: `/* vim: setlocal ft=go noet ai ts=4 sw=4 sts=4: */
 
 ### Linter Suppressions (intentional)
 | Rule | Reason |
@@ -186,10 +247,11 @@ go test -v -run TestName ./...   # Run specific test
 golangci-lint run ./...          # Lint
 ```
 
-Coverage: ~69% on internal/backer (main and log packages not covered by design)
+Coverage: ~69% on internal/backer (~100% on internal/log)
 
 ### Test Conventions
 - Reset global config: `C = Config{}`
+- Reset exclude patterns: `excludePatterns = nil`
 - Use `t.TempDir()` for temporary files
 - Helper function `writeTempConfig()` for config tests
 
@@ -208,3 +270,20 @@ Version is injected at build time via ldflags:
 ```go
 var version = "dev"  // overridden by: -X main.version=$(VERSION)
 ```
+
+## Request Flow (Good Path)
+```
+Request → Method Check (GET) → Auth Check → Get Files (with timeout) → Create Archive → Stream → Complete
+```
+
+## Request Flow (Error Paths)
+| Request | Response | Logged |
+|---------|----------|--------|
+| Non-GET method | 405 Method Not Allowed | Yes (info) |
+| No auth | 401 Unauthorized | Yes (info) |
+| Wrong credentials | 401 Unauthorized | Yes (info) |
+| Unknown path | 404 Not Found | Yes (info) |
+| Dir scan timeout | 504 Request Timeout | Yes (error) |
+| Failed to get files | 500 Internal Server Error | Yes (error) |
+| Client disconnect | - | Yes (info) |
+| Backup completed | 200 OK | Yes (info) |

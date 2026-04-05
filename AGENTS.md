@@ -207,6 +207,7 @@ Config is JSON (HJSON with comments supported). Default path depends on OS:
 | loglevel | `info` | Log verbosity: error/warn/info/debug |
 | directories | — | Directories to backup (required, validated for existence) |
 | backup_timeout | `60` | Stream timeout in minutes (1-1440) |
+| dir_scan_timeout | `60` | Directory scan timeout in minutes (1-1440) |
 | compression_level | `9` | Gzip level (1-9) |
 | exclude_patterns | `[]` | Regex patterns to exclude from backup |
 | filename_prefix | `backup` | Prefix for backup filename in Content-Disposition header |
@@ -302,7 +303,6 @@ The server uses `http.NewServeMux()` for routing. Multiple routes are registered
 
 ```go
 mux.Handle(C.Location, http.HandlerFunc(backupHandler))           // /archive
-mux.Handle(C.Location+"/", http.HandlerFunc(backupHandler))       // /archive/
 mux.Handle(C.Location+".tar.gz", http.HandlerFunc(backupHandler))  // /archive.tar.gz
 mux.Handle(C.Location+".tar.xz", http.HandlerFunc(backupHandler))   // /archive.tar.xz
 mux.Handle(C.Location+".tar.bz2", http.HandlerFunc(backupHandler)) // /archive.tar.bz2
@@ -317,6 +317,14 @@ The `getCompressionAlgorithm()` function handles both full paths and bare extens
 - Full path: `/archive.tar.xz` → `.tar.xz` → xz
 - Bare extension: `tar.xz` → `.tar.xz` → xz
 - Single ext: `xz` → `.xz` → xz
+
+### Unmatched Route Logging
+
+The server wraps the `http.ResponseWriter` to capture status codes and log unmatched routes:
+- **404 Not Found**: Logged as `"Not Found from {clientIP} to {path}"`
+- **405 Method Not Allowed**: Logged as `"Method Not Allowed from {clientIP} for {method} {path}"`
+
+This uses a `responseWriterWrapper` that tracks the status code via the `WriteHeader()` method.
 
 ## Dependencies
 

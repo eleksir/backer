@@ -15,9 +15,18 @@ func normalizePath(p string) string {
 	return strings.ReplaceAll(p, "\\", "/")
 }
 
+// normalizePathSlice normalizes all paths in a slice.
+func normalizePathSlice(paths []string) []string {
+	result := make([]string, len(paths))
+	for i, p := range paths {
+		result[i] = normalizePath(p)
+	}
+	return result
+}
+
 // TestGetFilesFromDirectories checks if GetFilesFromDirectories returns the proper amount of strings, correct strings and no error.
 func TestGetFilesFromDirectories(t *testing.T) {
-	testDataPath := filepath.Join("..", "test_data")
+	testDataPath := "../../test_data"
 
 	// Log the paths we're checking for debugging
 	t.Logf("Checking directories: %v", []string{
@@ -61,7 +70,8 @@ func TestGetFilesFromDirectories(t *testing.T) {
 
 	for _, filepath := range output {
 		normalized := normalizePath(filepath)
-		if !slices.Contains(expectedData, normalized) {
+		normalizedExpected := normalizePathSlice(expectedData)
+		if !slices.Contains(normalizedExpected, normalized) {
 			t.Errorf("expectedData data does not contain string from output: %s", filepath)
 		}
 	}
@@ -69,7 +79,7 @@ func TestGetFilesFromDirectories(t *testing.T) {
 
 // TestGetFilesFromDirectoriesSingleDir tests with a single directory.
 func TestGetFilesFromDirectoriesSingleDir(t *testing.T) {
-	testDataPath := filepath.Join("test_data")
+	testDataPath := filepath.Join("../../test_data")
 	output, err := GetFilesFromDirectories(context.Background(), []string{filepath.Join(testDataPath, "test1", "foo")})
 
 	if err != nil {
@@ -106,7 +116,7 @@ func TestGetFilesFromDirectoriesEmptyDir(t *testing.T) {
 // TestGetFilesFromDirectoriesNonExistent tests with non-existent directory.
 // Should log error but not fail - returns empty list.
 func TestGetFilesFromDirectoriesNonExistent(t *testing.T) {
-	testDataPath := filepath.Join("test_data")
+	testDataPath := filepath.Join("../../test_data")
 	nonExistentPath := filepath.Join(testDataPath, "nonexistent", "path", "that", "does", "not", "exist")
 	output, err := GetFilesFromDirectories(context.Background(), []string{nonExistentPath})
 
@@ -123,7 +133,7 @@ func TestGetFilesFromDirectoriesNonExistent(t *testing.T) {
 
 // TestGetFilesFromDirectoriesPartialFailure tests with mix of valid and invalid directories.
 func TestGetFilesFromDirectoriesPartialFailure(t *testing.T) {
-	testDataPath := filepath.Join("test_data")
+	testDataPath := filepath.Join("../../test_data")
 	// Create a temp directory that exists
 	tmpDir := t.TempDir()
 
@@ -142,7 +152,7 @@ func TestGetFilesFromDirectoriesPartialFailure(t *testing.T) {
 
 // TestGetFilesFromDirectoriesMultipleDirs tests multiple directories.
 func TestGetFilesFromDirectoriesMultipleDirs(t *testing.T) {
-	testDataPath := filepath.Join("test_data")
+	testDataPath := filepath.Join("../../test_data")
 	output, err := GetFilesFromDirectories(context.Background(), []string{
 		filepath.Join(testDataPath, "test1", "foo"),
 		filepath.Join(testDataPath, "test1", "bar"),

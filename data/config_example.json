@@ -47,6 +47,9 @@
     /* Regex patterns to exclude from backup.                                                                         */
     "exclude_patterns": [],
 
+    /* Maximum allowed time, spent for getting file list from backupped directories.                                  */
+    "dir_scan_timeout": 60,
+
     /* Directories to backup.                                                                                         */
     "directories": [
         "/path/to/directory1",

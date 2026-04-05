@@ -5,10 +5,10 @@
     /* By default listen on port 8086, like first intel commercially successful cpu model.                            */
     "port": 8086,
 
-    /* Path location of certificate file                                                                              */
+    /* Path location of test certificate file                                                                       */
     "cert": "../../test_data/example.crt",
 
-    /* Path location of certificate key                                                                               */
+    /* Path location of test certificate key                                                                          */
     "key": "../../test_data/example.key",
 
     /* We really want to use https for backup archive tranferring.                                                    */

@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"time"
 
 	backerlog "backer/internal/log"
 )
@@ -79,15 +78,6 @@ func GetFilesFromDirectories(ctx context.Context, directories []string) ([]strin
 	}
 
 	return files, nil
-}
-
-// GetFilesFromDirectoriesWithTimeout makes a file list of given directories with timeout.
-// Convenience wrapper that creates context from timeout in minutes.
-func GetFilesFromDirectoriesWithTimeout(timeoutMinutes int, directories []string) ([]string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMinutes)*time.Minute)
-	defer cancel()
-
-	return GetFilesFromDirectories(ctx, directories)
 }
 
 /* vim: setlocal ft=go noet ai ts=4 sw=4 sts=4: */

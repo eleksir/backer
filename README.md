@@ -65,6 +65,7 @@ All options described in example config.
 | loglevel | "info" | Verbosity of logs. | Options: error, warn, info, debug. |
 | directories | — | Directories to backup. | Required. Array of paths. |
 | backup_timeout | 60 | Timeout in minutes for backup streaming. | Range: 1-1440 minutes. |
+| dir_scan_timeout | 60 | Timeout in minutes for getting file list from all backupped directories. | Range: 1-1440 minutes. |
 | compression_level | 9 | Compression level. | 1 (fastest) to 9 (best compression). |
 | exclude_patterns | [] | Regex patterns to exclude from backup. | E.g., `[".*\\.tmp$", "/node_modules/"]`. |
 | filename_prefix | "backup" | Prefix for backup filename. | E.g., "mybackup" produces `mybackup-20260325-092341.tar.gz`. |

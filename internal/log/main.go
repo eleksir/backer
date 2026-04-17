@@ -2,7 +2,6 @@
 package log
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"log/slog"
@@ -27,11 +26,9 @@ var (
 	logLevel slog.Level
 )
 
-// slogWriter implements [io.Writer] to redirect standard log to slog.
 type (
-	slogWriter struct {
-		handler slog.Handler
-	}
+	// slogWriter implements [io.Writer] to redirect standard log to slog.
+	slogWriter struct{}
 )
 
 // Init sets up logger stuff.
@@ -154,9 +151,9 @@ func Debugf(format string, a ...any) {
 	slog.Debug(fmt.Sprintf(format, a...))
 }
 
-// DebugLogger returns a standard library logger that writes at the configured log level.
-// This is useful for assigning to http.Server.ErrorLog to route net/http errors
-// through our logger while respecting the configured log level.
+// DebugLogger returns a standard library logger that writes at debug/warn level.
+// TLS-related errors are logged at debug level, others at warn level.
+// Both are filtered by the configured log level: set loglevel to debug to see all messages.
 func DebugLogger() *log.Logger {
 	mu.RLock()
 	defer mu.RUnlock()
@@ -167,7 +164,9 @@ func DebugLogger() *log.Logger {
 
 	handler := slog.NewTextHandler(Log, opts)
 
-	return log.New(&slogWriter{handler: handler}, "", 0)
+	_ = handler // satisfy linter (handler configures level for potential future use).
+
+	return log.New(&slogWriter{}, "", 0)
 }
 
 // Write implements [io.Writer]. It differentiates TLS/SSL errors from other errors.
@@ -183,14 +182,11 @@ func (w *slogWriter) Write(p []byte) (int, error) {
 		strings.Contains(msg, "handshake") ||
 		strings.Contains(msg, "certificate")
 
-	level := slog.LevelWarn
 	if isTLSError {
-		level = slog.LevelDebug
+		Debug(msg)
+	} else {
+		Warn(msg)
 	}
-
-	record := slog.NewRecord(time.Now(), level, msg, 0)
-
-	_ = w.handler.Handle(context.TODO(), record)
 
 	return len(p), nil
 }

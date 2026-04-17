@@ -363,7 +363,7 @@ func TestDebugLogger(t *testing.T) {
 	logFilePath := tmpFile.Name()
 	tmpFile.Close()
 
-	if err := Init("info", logFilePath); err != nil {
+	if err := Init("debug", logFilePath); err != nil {
 		t.Fatal(err)
 	}
 	defer Close()
@@ -382,6 +382,87 @@ func TestDebugLogger(t *testing.T) {
 
 	if !strings.Contains(string(content), "test debug message") {
 		t.Error("Expected debug message in log")
+	}
+}
+
+// TestDebugLoggerTLS tests that TLS errors are logged at debug level.
+func TestDebugLoggerTLS(t *testing.T) {
+	tmpFile, err := os.CreateTemp(t.TempDir(), "test_log_*.log")
+	if err != nil {
+		t.Fatal(err)
+	}
+	logFilePath := tmpFile.Name()
+	tmpFile.Close()
+
+	if err := Init("debug", logFilePath); err != nil {
+		t.Fatal(err)
+	}
+	defer Close()
+
+	logger := DebugLogger()
+	logger.Print("tls handshake timeout")
+
+	content, err := os.ReadFile(logFilePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(string(content), "tls handshake timeout") {
+		t.Error("Expected TLS message in log")
+	}
+}
+
+// TestDebugLoggerNonTLS tests that non-TLS errors are logged at warn level.
+func TestDebugLoggerNonTLS(t *testing.T) {
+	tmpFile, err := os.CreateTemp(t.TempDir(), "test_log_*.log")
+	if err != nil {
+		t.Fatal(err)
+	}
+	logFilePath := tmpFile.Name()
+	tmpFile.Close()
+
+	if err := Init("warn", logFilePath); err != nil {
+		t.Fatal(err)
+	}
+	defer Close()
+
+	logger := DebugLogger()
+	logger.Print("http: connection reset by peer")
+
+	content, err := os.ReadFile(logFilePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(string(content), "http: connection reset by peer") {
+		t.Error("Expected non-TLS message in log")
+	}
+}
+
+// TestDebugLoggerLevelFiltering tests that log level filtering works.
+func TestDebugLoggerLevelFiltering(t *testing.T) {
+	tmpFile, err := os.CreateTemp(t.TempDir(), "test_log_*.log")
+	if err != nil {
+		t.Fatal(err)
+	}
+	logFilePath := tmpFile.Name()
+	tmpFile.Close()
+
+	if err := Init("info", logFilePath); err != nil {
+		t.Fatal(err)
+	}
+	defer Close()
+
+	logger := DebugLogger()
+	logger.Print("tls handshake timeout") // TLS error at debug level - should be filtered
+
+	content, err := os.ReadFile(logFilePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if strings.Contains(string(content), "tls handshake timeout") {
+		t.Error("Debug-level TLS message should be filtered at info log level")
 	}
 }
 

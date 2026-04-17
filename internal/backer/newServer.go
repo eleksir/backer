@@ -399,7 +399,7 @@ type (
 		*http.Server
 	}
 
-	// responseWriterWrapper wraps http.ResponseWriter to capture status code.
+	// responseWriterWrapper wraps [http.ResponseWriter] to capture status code.
 	responseWriterWrapper struct {
 		http.ResponseWriter
 		statusCode int

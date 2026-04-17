@@ -276,13 +276,16 @@ Checks `X-Forwarded-For` header first (for proxied requests), then falls back to
 
 ### TLS Error Handling
 
-The server uses a `ServerWrapper` type to intercept and classify errors from `Serve()` and `ServeTLS()`. TLS-specific errors are logged at debug level to reduce log clutter:
+The server uses a `ServerWrapper` type to intercept and classify errors from `Serve()` and `ServeTLS()`. Two mechanisms:
 
-- Uses `errors.As` to detect TLS error types: `tls.AlertError`, `tls.CertificateVerificationError`, `tls.ECHRejectionError`, `tls.RecordHeaderError`
-- Also checks for "tls:" prefix in error messages
-- Additionally uses `http.Server.ErrorLog` with a custom logger that writes at debug level for net/http's internal TLS-related messages
+1. **Server errors** (`Serve()` / `ServeTLS()`): Uses `errors.As` to detect TLS error types (`tls.AlertError`, `tls.CertificateVerificationError`, `tls.ECHRejectionError`, `tls.RecordHeaderError`) and checks for "tls:" prefix. TLS-specific errors logged at debug level, others at warn level.
 
-This ensures client-side TLS errors (handshake failures, certificate issues) don't clutter production logs.
+2. **net/http internal errors** (`http.Server.ErrorLog`): Uses `DebugLogger()` which routes messages through `slogWriter.Write()`:
+   - TLS-related errors (keywords: "tls", "ssl", "handshake", "certificate") → logged at debug level
+   - Other errors → logged at warn level
+   - Both are filtered by configured `loglevel`. Set `loglevel: debug` to see all messages.
+
+This ensures client-side TLS errors (handshake failures, certificate issues) don't clutter production logs by default.
 
 ### Compression Level Mapping
 

@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+
+	"github.com/klauspost/compress/zstd"
 )
 
 // TestCreateTarGzStreamBasic tests basic tar.gz creation with a single file.
@@ -614,6 +616,117 @@ func TestCreateTarXzStream(t *testing.T) {
 	_, err := io.ReadAll(reader)
 	if err != nil {
 		t.Fatalf("Failed to read xz archive: %v", err)
+	}
+}
+
+// TestCreateTarPgzipStream tests pgzip (parallel gzip) compression.
+func TestCreateTarPgzipStream(t *testing.T) {
+	C = Config{CompressionLevel: 6}
+
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.txt")
+	content := []byte("test content for pgzip")
+	if err := os.WriteFile(testFile, content, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := context.Background()
+	reader := CreateTarPgzipStream(ctx, []string{testFile})
+	defer reader.Close()
+
+	gzReader, err := gzip.NewReader(reader)
+	if err != nil {
+		t.Fatalf("Failed to create gzip reader: %v", err)
+	}
+	defer gzReader.Close()
+
+	tarReader := tar.NewReader(gzReader)
+
+	header, err := tarReader.Next()
+	if err != nil {
+		t.Fatalf("Failed to read tar header: %v", err)
+	}
+
+	if header.Name != testFile && filepath.Base(header.Name) != "test.txt" {
+		t.Errorf("Expected file name 'test.txt', got '%s'", header.Name)
+	}
+
+	data, err := io.ReadAll(tarReader)
+	if err != nil {
+		t.Fatalf("Failed to read file content: %v", err)
+	}
+
+	if string(data) != string(content) {
+		t.Errorf("Expected content '%s', got '%s'", content, data)
+	}
+}
+
+// TestCreateTarZstdStream tests zstd compression.
+func TestCreateTarZstdStream(t *testing.T) {
+	C = Config{CompressionLevel: 6}
+
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test.txt")
+	content := []byte("test content for zstd")
+	if err := os.WriteFile(testFile, content, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := context.Background()
+	reader := CreateTarZstdStream(ctx, []string{testFile})
+	defer reader.Close()
+
+	// zstd.Reader is in github.com/klauspost/compress/zstd
+	zstdReader, err := zstd.NewReader(reader)
+	if err != nil {
+		t.Fatalf("Failed to create zstd reader: %v", err)
+	}
+	defer zstdReader.Close()
+
+	tarReader := tar.NewReader(zstdReader)
+
+	header, err := tarReader.Next()
+	if err != nil {
+		t.Fatalf("Failed to read tar header: %v", err)
+	}
+
+	if header.Name != testFile && filepath.Base(header.Name) != "test.txt" {
+		t.Errorf("Expected file name 'test.txt', got '%s'", header.Name)
+	}
+
+	data, err := io.ReadAll(tarReader)
+	if err != nil {
+		t.Fatalf("Failed to read file content: %v", err)
+	}
+
+	if string(data) != string(content) {
+		t.Errorf("Expected content '%s', got '%s'", content, data)
+	}
+}
+
+// TestZstdLevel tests zstd level mapping.
+func TestZstdLevel(t *testing.T) {
+	tests := []struct {
+		input    int
+		expected zstd.EncoderLevel
+	}{
+		{1, zstd.SpeedFastest},
+		{2, zstd.SpeedFastest},
+		{3, zstd.SpeedFastest},
+		{4, zstd.SpeedDefault},
+		{5, zstd.SpeedDefault},
+		{6, zstd.SpeedDefault},
+		{7, zstd.SpeedBetterCompression},
+		{8, zstd.SpeedBetterCompression},
+		{9, zstd.SpeedBetterCompression},
+	}
+
+	for _, tt := range tests {
+		C = Config{CompressionLevel: tt.input}
+		result := zstdLevel(tt.input)
+		if result != tt.expected {
+			t.Errorf("zstdLevel(%d) = %v, expected %v", tt.input, result, tt.expected)
+		}
 	}
 }
 

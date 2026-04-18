@@ -13,8 +13,12 @@ func TestLoadConfig(t *testing.T) {
 	C = Config{}
 
 	testDataPath := filepath.Join(t.TempDir(), "test_data")
-	os.MkdirAll(filepath.Join(testDataPath, "test1", "foo"), 0755)
-	os.MkdirAll(filepath.Join(testDataPath, "test1", "bar"), 0755)
+	if err := os.MkdirAll(filepath.Join(testDataPath, "test1", "foo"), 0755); err != nil {
+		t.Fatalf("Failed to create test directory foo: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(testDataPath, "test1", "bar"), 0755); err != nil {
+		t.Fatalf("Failed to create test directory bar: %v", err)
+	}
 
 	// Create test config file
 	testConfigPath := filepath.Join(testDataPath, "test_config.json")

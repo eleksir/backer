@@ -125,46 +125,43 @@ func TestGetClientIP(t *testing.T) {
 
 // TestGetCompressionAlgorithm tests the getCompressionAlgorithm function.
 func TestGetCompressionAlgorithm(t *testing.T) {
+	// Save original config
+	original := C
+	defer func() { C = original }()
+
 	tests := []struct {
-		name     string
-		ext      string
-		expected string
+		name              string
+		ext               string
+		expected          string
+		defaultCompression string
 	}{
-		{
-			name:     "tar.bz2",
-			ext:      "tar.bz2",
-			expected: "bzip2",
-		},
-		{
-			name:     "tar.zst",
-			ext:      "tar.zst",
-			expected: "zstd",
-		},
-		{
-			name:     "tar.lz4",
-			ext:      "tar.lz4",
-			expected: "lz4",
-		},
-		{
-			name:     "tar.xz",
-			ext:      "tar.xz",
-			expected: "xz",
-		},
-		{
-			name:     "tar.gz",
-			ext:      "tar.gz",
-			expected: "pgzip",
-		},
-		{
-			name:     "default with gzip config",
-			ext:      "",
-			expected: "gzip",
-		},
+		{name: "tar.bz2", ext: "tar.bz2", expected: "bzip2"},
+		{name: "tar.zstd", ext: "tar.zstd", expected: "zstd"},
+		{name: "tar.zst", ext: "tar.zst", expected: "zstd"},
+		{name: "tar.lz4", ext: "tar.lz4", expected: "lz4"},
+		{name: "tar.xz", ext: "tar.xz", expected: "xz"},
+		{name: "tar.gz", ext: "tar.gz", expected: "pgzip"},
+		{name: "bz2", ext: "bz2", expected: "bzip2"},
+		{name: "zst", ext: "zst", expected: "zstd"},
+		{name: "lz4", ext: "lz4", expected: "lz4"},
+		{name: "xz", ext: "xz", expected: "xz"},
+		{name: "gz", ext: "gz", expected: "pgzip"},
+		{name: "zstd", ext: "zstd", expected: "zstd"},
+		{name: "full path /archive.tar.gz", ext: "/archive.tar.gz", expected: "pgzip"},
+		{name: "full path /archive.tar.xz", ext: "/archive.tar.xz", expected: "xz"},
+		{name: "full path /archive", ext: "/archive", expected: "gzip"},
+		{name: "empty uses default", ext: "", expected: "gzip"},
+		{name: "unknown uses default", ext: "unknown", expected: "gzip"},
+		{name: "unknown with default zstd", ext: "unknown", expected: "zstd", defaultCompression: "zstd"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			C = Config{DefaultCompression: "gzip"}
+			if tt.defaultCompression != "" {
+				C = Config{DefaultCompression: tt.defaultCompression}
+			} else {
+				C = Config{DefaultCompression: "gzip"}
+			}
 			result := getCompressionAlgorithm(tt.ext)
 			if result != tt.expected {
 				t.Errorf("getCompressionAlgorithm(%q) = %q, expected %q", tt.ext, result, tt.expected)
@@ -189,6 +186,46 @@ func TestNewServerSuccess(t *testing.T) {
 	if server.Addr != "127.0.0.1:8086" {
 		t.Errorf("Expected address '127.0.0.1:8086', got '%s'", server.Addr)
 	}
+}
+
+// TestWithServerHeader tests that the Server header is added to responses.
+func TestWithServerHeader(t *testing.T) {
+	handler := withServerHeader(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	rec := &responseWriterWrapper{
+		ResponseWriter: &testResponseWriter{},
+		statusCode:     0,
+	}
+
+	req, _ := http.NewRequest("GET", "/test", nil)
+	handler.ServeHTTP(rec, req)
+
+	if rec.Header().Get("Server") != "backer" {
+		t.Error("Expected Server header to be set to 'backer'")
+	}
+}
+
+// testResponseWriter implements http.ResponseWriter for testing.
+type testResponseWriter struct {
+	header http.Header
+	status int
+}
+
+func (tw *testResponseWriter) Header() http.Header {
+	if tw.header == nil {
+		tw.header = make(http.Header)
+	}
+	return tw.header
+}
+
+func (tw *testResponseWriter) Write(data []byte) (int, error) {
+	return len(data), nil
+}
+
+func (tw *testResponseWriter) WriteHeader(status int) {
+	tw.status = status
 }
 
 // TestNewServerInvalidConfig tests server creation with invalid config.
@@ -615,6 +652,32 @@ func TestMethodNotAllowedHandler(t *testing.T) {
 
 	if resp.StatusCode != http.StatusMethodNotAllowed {
 		t.Errorf("Expected status 405, got %d", resp.StatusCode)
+	}
+}
+
+// TestTimingSafeMatch tests the timingSafeMatch function for constant-time comparison.
+func TestTimingSafeMatch(t *testing.T) {
+	tests := []struct {
+		name     string
+		a        string
+		b        string
+		expected bool
+	}{
+		{"empty strings", "", "", true},
+		{"identical strings", "test", "test", true},
+		{"different strings", "test", "Test", false},
+		{"different length", "test", "testing", false},
+		{"first empty", "", "test", false},
+		{"second empty", "test", "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := timingSafeMatch(tt.a, tt.b)
+			if result != tt.expected {
+				t.Errorf("timingSafeMatch(%q, %q) = %v, expected %v", tt.a, tt.b, result, tt.expected)
+			}
+		})
 	}
 }
 

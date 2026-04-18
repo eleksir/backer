@@ -86,6 +86,8 @@ func writeFilesToTar(ctx context.Context, filepaths []string, tw *tar.Writer, cl
 		var (
 			err        error
 			linkTarget string
+			isSymlink  bool
+			isHardLink bool
 		)
 
 		select {
@@ -107,6 +109,7 @@ func writeFilesToTar(ctx context.Context, filepaths []string, tw *tar.Writer, cl
 			continue
 		}
 
+		// Handle symlinks - read target path and mark as symbolic link.
 		if st.Mode()&os.ModeSymlink != 0 {
 			linkTarget, err = os.Readlink(fpath)
 
@@ -115,6 +118,8 @@ func writeFilesToTar(ctx context.Context, filepaths []string, tw *tar.Writer, cl
 
 				continue
 			}
+
+			isSymlink = true
 		}
 
 		// Skip sockets explicitly (they cannot be backed up).
@@ -125,12 +130,15 @@ func writeFilesToTar(ctx context.Context, filepaths []string, tw *tar.Writer, cl
 		}
 
 		// Check for hard link - if inode was already seen, store as link instead of content.
-		if st.Mode().IsRegular() {
+		// Only check for regular files (not symlinks).
+		if st.Mode().IsRegular() && !isSymlink {
 			inode := getInode(st)
 			if inode != 0 {
 				if existingPath, seen := seenInodes[inode]; seen {
 					// This is a hard link to already-archived file.
 					linkTarget = existingPath
+					isHardLink = true
+
 					log.Debugf("Hard link detected: %s -> %s", fpath, existingPath)
 				} else {
 					// First time seeing this inode - track it.
@@ -147,8 +155,11 @@ func writeFilesToTar(ctx context.Context, filepaths []string, tw *tar.Writer, cl
 			continue
 		}
 
-		// If linkTarget is set, ensure the header is marked as a link.
-		if linkTarget != "" {
+		// Set correct type flag for symbolic links or hard links.
+		if isSymlink {
+			header.Typeflag = tar.TypeSymlink
+			header.Linkname = linkTarget
+		} else if isHardLink {
 			header.Typeflag = tar.TypeLink
 			header.Linkname = linkTarget
 		}

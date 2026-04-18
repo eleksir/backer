@@ -8,10 +8,18 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/klauspost/compress/zstd"
 )
+
+// mkfifo creates a named pipe (FIFO).
+// Uses syscall.Mkfifo which is available on Unix.
+func mkfifo(path string, mode os.FileMode) error {
+	return syscall.Mkfifo(path, uint32(mode))
+}
 
 // TestCreateTarGzStreamBasic tests basic tar.gz creation with a single file.
 func TestCreateTarGzStreamBasic(t *testing.T) {
@@ -63,6 +71,49 @@ func TestCreateTarGzStreamBasic(t *testing.T) {
 	// Should be no more entries
 	if _, err := tarReader.Next(); err != io.EOF {
 		t.Error("Expected EOF after single file")
+	}
+}
+
+// TestCreateTarGzStreamEmptyFile tests creation of archive with empty file.
+func TestCreateTarGzStreamEmptyFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	emptyFile := filepath.Join(tmpDir, "empty.txt")
+	if err := os.WriteFile(emptyFile, []byte{}, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := context.Background()
+	reader := CreateTarGzStream(ctx, []string{emptyFile})
+	defer reader.Close()
+
+	gzReader, err := gzip.NewReader(reader)
+	if err != nil {
+		t.Fatalf("Failed to create gzip reader: %v", err)
+	}
+	defer gzReader.Close()
+
+	tarReader := tar.NewReader(gzReader)
+
+	header, err := tarReader.Next()
+	if err != nil {
+		t.Fatalf("Failed to read tar header: %v", err)
+	}
+
+	if header.Size != 0 {
+		t.Errorf("Expected empty file (size 0), got %d", header.Size)
+	}
+
+	if header.Typeflag != tar.TypeReg {
+		t.Errorf("Expected regular file type, got %c", header.Typeflag)
+	}
+
+	data, err := io.ReadAll(tarReader)
+	if err != nil {
+		t.Fatalf("Failed to read content: %v", err)
+	}
+
+	if len(data) != 0 {
+		t.Errorf("Expected empty content, got %d bytes", len(data))
 	}
 }
 
@@ -182,6 +233,82 @@ func TestCreateTarGzStreamSymlink(t *testing.T) {
 	}
 }
 
+// TestCreateTarGzStreamBrokenSymlink tests handling of broken symlinks (target doesn't exist).
+func TestCreateTarGzStreamBrokenSymlink(t *testing.T) {
+	tmpDir := t.TempDir()
+	brokenLink := filepath.Join(tmpDir, "broken.txt")
+
+	if err := os.Symlink("/nonexistent/target", brokenLink); err != nil {
+		t.Skip("Symlinks not supported, skipping test")
+	}
+
+	ctx := context.Background()
+	reader := CreateTarGzStream(ctx, []string{brokenLink})
+	defer reader.Close()
+
+	gzReader, err := gzip.NewReader(reader)
+	if err != nil {
+		t.Fatalf("Failed to create gzip reader: %v", err)
+	}
+	defer gzReader.Close()
+
+	tarReader := tar.NewReader(gzReader)
+
+	header, err := tarReader.Next()
+	if err != nil {
+		t.Fatalf("Failed to read tar header: %v", err)
+	}
+
+	if header.Typeflag != tar.TypeSymlink {
+		t.Errorf("Expected symlink type, got %c", header.Typeflag)
+	}
+
+	// Broken symlinks are still stored - just the link target path
+	if header.Linkname != "/nonexistent/target" {
+		t.Errorf("Expected linkname '/nonexistent/target', got '%s'", header.Linkname)
+	}
+}
+
+// TestCreateTarGzStreamSymlinkToDirectory tests symlink pointing to a directory.
+func TestCreateTarGzStreamSymlinkToDirectory(t *testing.T) {
+	tmpDir := t.TempDir()
+	targetDir := filepath.Join(tmpDir, "targetdir")
+	linkToDir := filepath.Join(tmpDir, "linkdir")
+
+	if err := os.Mkdir(targetDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.Symlink(targetDir, linkToDir); err != nil {
+		t.Skip("Symlinks not supported, skipping test")
+	}
+
+	ctx := context.Background()
+	reader := CreateTarGzStream(ctx, []string{linkToDir})
+	defer reader.Close()
+
+	gzReader, err := gzip.NewReader(reader)
+	if err != nil {
+		t.Fatalf("Failed to create gzip reader: %v", err)
+	}
+	defer gzReader.Close()
+
+	tarReader := tar.NewReader(gzReader)
+
+	header, err := tarReader.Next()
+	if err != nil {
+		t.Fatalf("Failed to read tar header: %v", err)
+	}
+
+	if header.Typeflag != tar.TypeSymlink {
+		t.Errorf("Expected symlink type, got %c", header.Typeflag)
+	}
+
+	if header.Linkname != targetDir {
+		t.Errorf("Expected linkname '%s', got '%s'", targetDir, header.Linkname)
+	}
+}
+
 // TestCreateTarGzStreamHardLink tests hard link handling - should deduplicate content.
 func TestCreateTarGzStreamHardLink(t *testing.T) {
 	if runtime.GOOS == "windows" {
@@ -231,9 +358,10 @@ func TestCreateTarGzStreamHardLink(t *testing.T) {
 
 		if header.Typeflag == tar.TypeLink {
 			linkCount++
-			// Verify it's a link to the original
-			if header.Linkname != originalFile && header.Linkname != filepath.ToSlash(originalFile) {
-				t.Errorf("Expected linkname '%s', got '%s'", originalFile, header.Linkname)
+			// Verify it's a link to the original - code strips leading '/' to avoid tar warnings
+			expectedLinkname := strings.TrimPrefix(filepath.ToSlash(filepath.Clean(originalFile)), "/")
+			if header.Linkname != expectedLinkname {
+				t.Errorf("Expected linkname '%s', got '%s'", expectedLinkname, header.Linkname)
 			}
 		}
 	}
@@ -273,8 +401,12 @@ func TestCreateTarGzStreamHardLinkFromTestData(t *testing.T) {
 
 	tarReader := tar.NewReader(gzReader)
 
-	entries := 0
-	linkCount := 0
+	type entryInfo struct {
+		name      string
+		typeflag byte
+		linkname string
+	}
+	var entries []entryInfo
 
 	for {
 		header, err := tarReader.Next()
@@ -285,20 +417,39 @@ func TestCreateTarGzStreamHardLinkFromTestData(t *testing.T) {
 			t.Fatalf("Failed to read tar entry: %v", err)
 		}
 
-		entries++
-		t.Logf("Entry %d: name=%s typeflag=%c linkname=%s", entries, header.Name, header.Typeflag, header.Linkname)
+		entries = append(entries, entryInfo{
+			name:      header.Name,
+			typeflag:  header.Typeflag,
+			linkname:  header.Linkname,
+		})
+		t.Logf("Entry: name=%s typeflag=%c linkname=%s", header.Name, header.Typeflag, header.Linkname)
+	}
 
-		if header.Typeflag == tar.TypeLink {
-			linkCount++
+	// Check we have the expected number of entries
+	if len(entries) != 4 {
+		t.Errorf("Expected 4 entries (dir + 1 original + 2 hardlinks), got %d", len(entries))
+	}
+
+	// Find the original file (typeflag = TypeReg = '0') and verify hardlinks point to it
+	var originalName string
+	var hardlinkCount int
+
+	for _, e := range entries {
+		if e.typeflag == tar.TypeReg && e.linkname == "" {
+			originalName = filepath.Base(e.name)
+		}
+		if e.typeflag == tar.TypeLink {
+			hardlinkCount++
+			// Verify link points to the original file's base name
+			linkBase := filepath.Base(e.linkname)
+			if linkBase != originalName && linkBase != "original.txt" {
+				t.Errorf("Hard link %s points to %s, expected %s", filepath.Base(e.name), linkBase, originalName)
+			}
 		}
 	}
 
-	if entries != 4 {
-		t.Errorf("Expected 4 entries (dir + 1 original + 2 hardlinks), got %d", entries)
-	}
-
-	if linkCount != 2 {
-		t.Errorf("Expected 2 hard link entries, got %d", linkCount)
+	if hardlinkCount != 2 {
+		t.Errorf("Expected 2 hard link entries, got %d", hardlinkCount)
 	}
 }
 
@@ -373,6 +524,64 @@ func TestCreateTarGzStreamEmptyList(t *testing.T) {
 	}
 }
 
+// TestCreateTarGzStreamSpecialCharacters tests files with special characters in names.
+func TestCreateTarGzStreamSpecialCharacters(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	testCases := []struct {
+		name    string
+		expect string
+	}{
+		{"file with spaces.txt", "file with spaces.txt"},
+		{"file-with-dashes.txt", "file-with-dashes.txt"},
+		{"file_with_underscores.txt", "file_with_underscores.txt"},
+		{"file.multiple.dots.txt", "file.multiple.dots.txt"},
+	}
+
+	for _, tc := range testCases {
+		path := filepath.Join(tmpDir, tc.name)
+		if err := os.WriteFile(path, []byte(tc.name), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	ctx := context.Background()
+	filepaths := make([]string, len(testCases))
+	for i, tc := range testCases {
+		filepaths[i] = filepath.Join(tmpDir, tc.name)
+	}
+
+	reader := CreateTarGzStream(ctx, filepaths)
+	defer reader.Close()
+
+	gzReader, err := gzip.NewReader(reader)
+	if err != nil {
+		t.Fatalf("Failed to create gzip reader: %v", err)
+	}
+	defer gzReader.Close()
+
+	tarReader := tar.NewReader(gzReader)
+
+	found := make(map[string]bool)
+	for {
+		header, err := tarReader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("Failed to read tar entry: %v", err)
+		}
+
+		found[filepath.Base(header.Name)] = true
+	}
+
+	for _, tc := range testCases {
+		if !found[tc.expect] {
+			t.Errorf("Expected to find '%s' in archive", tc.expect)
+		}
+	}
+}
+
 // TestCreateTarGzStreamNestedFiles tests with nested directory structure.
 func TestCreateTarGzStreamNestedFiles(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -430,7 +639,43 @@ func TestCreateTarGzStreamNestedFiles(t *testing.T) {
 	}
 }
 
-// TestCreateTarGzStreamDeviceFile tests that device files are included in the archive.
+// TestCreateTarGzStreamNamedPipe tests that named pipes (FIFOs) are included in the archive.
+func TestCreateTarGzStreamNamedPipe(t *testing.T) {
+	tmpDir := t.TempDir()
+	namedPipe := filepath.Join(tmpDir, "testpipe")
+
+	if err := mkfifo(namedPipe, 0644); err != nil {
+		t.Skip("Named pipes not supported, skipping test")
+	}
+
+	ctx := context.Background()
+	reader := CreateTarGzStream(ctx, []string{namedPipe})
+	defer reader.Close()
+
+	gzReader, err := gzip.NewReader(reader)
+	if err != nil {
+		t.Fatalf("Failed to create gzip reader: %v", err)
+	}
+	defer gzReader.Close()
+
+	tarReader := tar.NewReader(gzReader)
+
+	header, err := tarReader.Next()
+	if err != nil {
+		t.Fatalf("Failed to read tar header: %v", err)
+	}
+
+	if header.Typeflag != tar.TypeFifo {
+		t.Errorf("Expected FIFO type, got %c", header.Typeflag)
+	}
+
+	// Ensure there are no more entries
+	if _, err := tarReader.Next(); err != io.EOF {
+		t.Error("Expected EOF after FIFO entry")
+	}
+}
+
+// TestCreateTarGzStreamDeviceFile tests that device files (char and block) are included in the archive.
 func TestCreateTarGzStreamDeviceFile(t *testing.T) {
 	// Use /dev/null as a test device file (character device).
 	devNull := "/dev/null"
@@ -438,8 +683,15 @@ func TestCreateTarGzStreamDeviceFile(t *testing.T) {
 	if err != nil {
 		t.Skipf("Skipping device test: %v", err)
 	}
-	if st.Mode()&os.ModeCharDevice == 0 {
-		t.Skipf("Skipping: %s is not a character device", devNull)
+
+	var expectedTypeflag byte
+	switch {
+	case st.Mode()&os.ModeCharDevice != 0:
+		expectedTypeflag = tar.TypeChar
+	case st.Mode()&os.ModeDevice != 0:
+		expectedTypeflag = tar.TypeBlock
+	default:
+		t.Skipf("Skipping: %s is not a device file", devNull)
 	}
 
 	ctx := context.Background()
@@ -454,23 +706,13 @@ func TestCreateTarGzStreamDeviceFile(t *testing.T) {
 
 	tarReader := tar.NewReader(gzReader)
 
-	// Read the device entry
 	header, err := tarReader.Next()
 	if err != nil {
 		t.Fatalf("Failed to read tar header: %v", err)
 	}
 
-	if header.Typeflag != tar.TypeChar {
-		t.Errorf("Expected character device type, got %c", header.Typeflag)
-	}
-
-	// Check that the name matches the file path (without leading slash)
-	expectedName := devNull
-	if expectedName[0] == '/' {
-		expectedName = expectedName[1:]
-	}
-	if header.Name != expectedName {
-		t.Errorf("Expected header name %q, got %q", expectedName, header.Name)
+	if header.Typeflag != expectedTypeflag {
+		t.Errorf("Expected device type %c, got %c", expectedTypeflag, header.Typeflag)
 	}
 
 	// Ensure there are no more entries

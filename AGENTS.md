@@ -278,10 +278,30 @@ Two helper functions in `newServer.go` handle context cancellation during stream
 - **Regular files**: streamed into tar archive with content
 - **Directories**: included as tar directory entries
 - **Symlinks**: stored as symlink entries (target path preserved). Backer never resolves or follows symlinks during directory traversal — it uses `os.Lstat` and `filepath.WalkDir` which do not follow symlinks. This means symlink cycles are impossible to occur.
+- **Broken symlinks**: archived with their target path (even if target doesn't exist)
 - **Device files** (char/block): included with correct major/minor
-- **Named pipes**: included (header only, no data)
+- **Named pipes (FIFOs)**: included (header only, no data)
 - **Sockets**: skipped (not archivable)
 - **Hard links**: deduplicated — if multiple files share the same inode, only the first is stored with content, subsequent hard links are stored as link entries pointing to the original
+- **GNU tar format**: archives use GNU tar format (`header.Format = tar.FormatGNU`) for compatibility with GNU tar utility
+
+### Archive Test Coverage
+
+All entity types are tested in `internal/backer/utils_test.go`:
+
+| Entity Type | Test Function |
+|------------|---------------|
+| Regular file | `TestCreateTarGzStreamBasic` |
+| Empty file | `TestCreateTarGzStreamEmptyFile` |
+| Directory | `TestCreateTarGzStreamDirectory` |
+| Symlink | `TestCreateTarGzStreamSymlink` |
+| Broken symlink | `TestCreateTarGzStreamBrokenSymlink` |
+| Symlink to directory | `TestCreateTarGzStreamSymlinkToDirectory` |
+| Hard link | `TestCreateTarGzStreamHardLink` |
+| Character device | `TestCreateTarGzStreamDeviceFile` (falls back to char device) |
+| Named pipe (FIFO) | `TestCreateTarGzStreamNamedPipe` |
+| Special characters in names | `TestCreateTarGzStreamSpecialCharacters` |
+| Nested files | `TestCreateTarGzStreamNestedFiles` |
 
 ### Pipe Error Recovery
 

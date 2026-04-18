@@ -133,12 +133,18 @@ Skips files that can't be read (logs warning, continues backup).
 Backup filenames include timestamp and configured prefix: `backup-20060102-150405.tar.gz` (extension depends on compression_algorithm).
 
 ### Special File Types
-- **Device files** (character/block) are included with correct major/minor numbers.
-- **Sockets** are skipped (no entry created).
-- **Symlinks** are stored as symlinks (target path stored) - uses os.Lstat, no cycles possible.
-- **Named pipes** and other special files are included (tar header created).
-- **Hard links** are deduplicated - first occurrence stored with content, subsequent as link entries.
-- **Regular files** are compressed; other file types have no data section.
+- **Regular files**: streamed into tar archive with content
+- **Directories**: included as tar directory entries
+- **Symlinks**: stored as symlink entries (target path preserved) - uses os.Lstat, no cycles possible
+- **Broken symlinks**: archived with their target path (even if target doesn't exist)
+- **Device files** (char/block): included with correct major/minor numbers
+- **Named pipes (FIFOs)**: included (header only, no data)
+- **Sockets**: skipped (not archivable)
+- **Hard links**: deduplicated - first occurrence stored with content, subsequent as link entries
+- **GNU tar format**: uses `header.Format = tar.FormatGNU` for GNU tar compatibility
+
+### Test Coverage
+All entity types are tested: regular files, empty files, directories, symlinks, broken symlinks, symlinks to directories, hard links, device files, named pipes (FIFOs), special characters in filenames.
 
 ### Error Recovery
 - `writeWithContext` checks context before calling fn.

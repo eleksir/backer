@@ -27,6 +27,36 @@ Backer is a Go-based HTTP/HTTPS backup server that creates compressed archives o
 - **Don't use `context` package unless absolutely necessary.** Try to find another solution first.
 - **Create functional and unit tests if possible/necessary** to verify changes that software code works at is should.
 
+### Test Rules
+
+- **Test data must be self-contained and created at test setup.** All test data should be created in `TestMain` in `internal/backer/main_test.go` before any tests run, not rely on pre-existing files in the repository. Use `test_data/test1/` as the test data directory.
+
+- **Use `test_data/tmp/` for temporary files.** When tests need temporary storage, use this directory (not system `/tmp`) to keep test data isolated and predictable.
+
+- **Always check errors with meaningful diagnostics.** Never discard errors with `_ =`. Use patterns like:
+  ```go
+  if err := os.MkdirAll(dir, 0755); err != nil {
+      t.Fatalf("Failed to create directory %s: %v", dir, err)
+  }
+  ```
+
+- **Tests must not depend on external state.** Test data should be created fresh for each test run and cleaned up afterward. Use `TestMain` with setup/cleanup functions.
+
+- **Use `t.Fatal` or `t.Fatalf` for setup errors.** When test setup fails, fail fast with clear diagnostic messages showing what failed and why.
+
+- **Reset global state between tests.** For tests that modify global variables (like `C` config), save the original value and restore it in a `defer`:
+  ```go
+  original := C
+  defer func() { C = original }()
+  ```
+
+- **Skip tests gracefully when features are unavailable.** For platform-specific features (hardlinks, symlinks), use `t.Skip()` when the feature is not supported:
+  ```go
+  if err := os.Link(orig, link); err != nil {
+      t.Skip("Hard links not supported, skipping test")
+  }
+  ```
+
 ## Build & Test Commands
 
 ```bash
@@ -359,10 +389,14 @@ Tests live alongside source files as `*_test.go` (package name, not `_test` suff
 
 ### Test Data
 
-- `test_data/test_config.json` — valid test config (user: JohnnyGoode, password: SharpShooter)
-- `test_data/test1/foo/` — test directory with files, subdirs, empty dirs
+All test data is created by `TestMain` in `internal/backer/main_test.go` before tests run and cleaned up afterward. This ensures tests are independent of pre-existing files.
+
+- `test_data/test1/foo/` — test directory with files, subdirs, empty_dir
 - `test_data/test1/bar/` — test directory with files and a directory named `goodbye.txt/` (edge case: directory with file extension)
-- `test_data/example.crt` / `example.key` — TLS test certificates
+- `test_data/test1/hardlinks/` — test directory with hard-linked files (original.txt, hardlink1.txt, hardlink2.txt)
+- `test_data/test1/symlinks/` — test directory with symbolic links
+- `test_data/test1/empty_dir/` — empty directory for testing
+- `test_data/tmp/` — reserved for test temporary files (use instead of system `/tmp`)
 
 ## Service Deployment
 

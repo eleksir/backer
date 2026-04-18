@@ -242,25 +242,38 @@ if C.Port < 1 || C.Port > 65535 {
 
 ## Testing
 ```bash
-go test ./...                    # Run tests
+go test ./...                    # Run tests (runs make clean first)
 go test -v -run TestName ./...   # Run specific test
 golangci-lint run ./...          # Lint
+make test                        # Clean + test (deterministic)
 ```
 
-Coverage: ~69% on internal/backer (~100% on internal/log)
+Coverage: ~64% on internal/backer (~100% on internal/log)
+
+### Test Data
+All test data is created by `TestMain` in `internal/backer/main_test.go` before tests run and cleaned up afterward. This ensures tests are independent of pre-existing files.
+
+- `test_data/test1/foo/` — test directory with files, subdirs, empty_dir
+- `test_data/test1/bar/` — test directory with files and a directory named `goodbye.txt/` (edge case: directory with file extension)
+- `test_data/test1/hardlinks/` — test directory with hard-linked files (original.txt, hardlink1.txt, hardlink2.txt)
+- `test_data/test1/symlinks/` — test directory with symbolic links
+- `test_data/test1/empty_dir/` — empty directory for testing
+- `test_data/tmp/` — reserved for test temporary files (use instead of system `/tmp`)
 
 ### Test Conventions
 - Reset global config: `C = Config{}`
 - Reset exclude patterns: `excludePatterns = nil`
 - Use `t.TempDir()` for temporary files
 - Helper function `writeTempConfig()` for config tests
+- Test data created by TestMain setup, cleaned after tests
+- Always check errors with meaningful diagnostics (use `t.Fatalf` for setup errors)
 
 ## Build
 ```bash
-make           # Build binary (version from git or "dev")
+make           # Clean + build binary (version from git or "dev")
 make build VERSION=0.1.0  # Build with specific version
-make clean     # Remove binary
-make test      # Run tests
+make clean     # Remove binary, test_data/tmp, test_data/test1
+make test      # Clean + test (deterministic)
 make upgrade   # Update dependencies
 make help      # Show targets
 ```

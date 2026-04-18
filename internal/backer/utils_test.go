@@ -247,6 +247,59 @@ func TestCreateTarGzStreamHardLink(t *testing.T) {
 	}
 }
 
+// TestCreateTarGzStreamHardLinkFromTestData tests hard link handling with test data.
+func TestCreateTarGzStreamHardLinkFromTestData(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Hard link detection not supported on Windows (inodes unavailable)")
+	}
+
+	testDataPath := filepath.Join("../../test_data", "test1", "hardlinks")
+	filepaths, err := GetFilesFromDirectories(context.Background(), []string{testDataPath})
+	if err != nil {
+		t.Fatalf("Failed to get files from directory: %v", err)
+	}
+
+	ctx := context.Background()
+	reader := CreateTarGzStream(ctx, filepaths)
+	defer reader.Close()
+
+	gzReader, err := gzip.NewReader(reader)
+	if err != nil {
+		t.Fatalf("Failed to create gzip reader: %v", err)
+	}
+	defer gzReader.Close()
+
+	tarReader := tar.NewReader(gzReader)
+
+	entries := 0
+	linkCount := 0
+
+	for {
+		header, err := tarReader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("Failed to read tar entry: %v", err)
+		}
+
+		entries++
+		t.Logf("Entry %d: name=%s typeflag=%c linkname=%s", entries, header.Name, header.Typeflag, header.Linkname)
+
+		if header.Typeflag == tar.TypeLink {
+			linkCount++
+		}
+	}
+
+	if entries != 4 {
+		t.Errorf("Expected 4 entries (dir + 1 original + 2 hardlinks), got %d", entries)
+	}
+
+	if linkCount != 2 {
+		t.Errorf("Expected 2 hard link entries, got %d", linkCount)
+	}
+}
+
 // TestCreateTarGzStreamCancellation tests context cancellation.
 func TestCreateTarGzStreamCancellation(t *testing.T) {
 	tmpDir := t.TempDir()

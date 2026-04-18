@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"backer/internal/log"
 )
@@ -149,6 +150,7 @@ func writeFilesToTar(ctx context.Context, filepaths []string, tw *tar.Writer, cl
 		// If linkTarget is set, ensure the header is marked as a link.
 		if linkTarget != "" {
 			header.Typeflag = tar.TypeLink
+			header.Linkname = linkTarget
 		}
 
 		header.Format = tar.FormatGNU
@@ -164,8 +166,8 @@ func writeFilesToTar(ctx context.Context, filepaths []string, tw *tar.Writer, cl
 			return
 		}
 
-		// Only stream file contents for regular files.
-		if mode.IsRegular() {
+		// Only stream file contents for regular files that are not hard links.
+		if mode.IsRegular() && linkTarget == "" {
 			f, err := os.Open(fpath)
 			if err != nil {
 				log.Warnf("Skipping %s: open failed: %v", fpath, err)
@@ -195,15 +197,12 @@ func getInode(fi os.FileInfo) uint64 {
 		return 0
 	}
 
-	// Use type assertion to get inode - works on Unix, returns 0 on Windows.
-	type inodeGetter interface {
-		Dev() uint64
-		Ino() uint64
-	}
-
-	if ig, ok := fi.Sys().(inodeGetter); ok {
-		// Combine device and inode for uniqueness across file systems.
-		return (ig.Dev() << 32) | ig.Ino()
+	// Use reflection to get Dev and Ino fields from the syscall.Stat_t struct.
+	st := fi.Sys()
+	// Try type assertion for the struct with fields.
+	switch v := st.(type) {
+	case *syscall.Stat_t:
+		return (v.Dev << 32) | v.Ino
 	}
 
 	return 0

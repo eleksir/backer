@@ -136,7 +136,8 @@ func writeFilesToTar(ctx context.Context, filepaths []string, tw *tar.Writer, cl
 			if inode != 0 {
 				if existingPath, seen := seenInodes[inode]; seen {
 					// This is a hard link to already-archived file.
-					linkTarget = existingPath
+					// To avoid "tar: Removing leading `/' from hard link targets" message, remove leading slash.
+					linkTarget = strings.TrimPrefix(filepath.ToSlash(filepath.Clean(existingPath)), "/")
 					isHardLink = true
 
 					log.Debugf("Hard link detected: %s -> %s", fpath, existingPath)

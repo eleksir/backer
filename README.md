@@ -128,9 +128,12 @@ Backer handles various file types when creating archives:
 - **Regular files**: Included with full content
 - **Directories**: Included as directory entries
 - **Symlinks**: Stored as symlink entries (target path preserved)
+- **Broken symlinks**: Archived with their target path (even if target doesn't exist)
 - **Device files**: Character and block devices included with correct major/minor
-- **Named pipes**: Included (header only, no data)
+- **Named pipes (FIFOs)**: Included (header only, no data)
+- **Sockets**: Skipped (not archivable)
 - **Hard links**: Deduplicated — multiple hard links to the same file are stored as link entries to avoid duplication
+- **GNU tar format**: Compatible with GNU tar utility
 
 ## Logging
 

@@ -23,13 +23,15 @@ build:
 
 clean:
 	rm -f $(BINARY)
+	rm -rf test_data/tmp
+	rm -rf test_data/test1
 
 upgrade:
 	go get -u ./...
 	go mod tidy
 	go mod vendor
 
-test:
+test: clean
 	go test ./...
 
 help:
